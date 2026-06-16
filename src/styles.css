@@ -5,7 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -31,71 +32,54 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
-  --color-ios-blue: var(--ios-blue);
-  --color-ios-red: var(--ios-red);
-  --color-ios-green: var(--ios-green);
-  --color-ios-orange: var(--ios-orange);
-  --color-ios-purple: var(--ios-purple);
+  --color-today: var(--today);
 }
 
-/* ── Light Mode (iOS style) ─────────────────────────────── */
 :root {
-  --radius: 0.625rem;
-  --background: #ffffff;
-  --foreground: #1c1c1e;
-  --card: #ffffff;
-  --card-foreground: #1c1c1e;
-  --popover: #ffffff;
-  --popover-foreground: #1c1c1e;
-  --primary: #007aff;
-  --primary-foreground: #ffffff;
-  --secondary: #f2f2f7;
-  --secondary-foreground: #1c1c1e;
-  --muted: #f2f2f7;
-  --muted-foreground: #8e8e93;
-  --accent: #007aff;
-  --accent-foreground: #ffffff;
-  --destructive: #ff3b30;
-  --destructive-foreground: #ffffff;
-  --border: #c6c6c8;
-  --input: #f2f2f7;
-  --ring: #007aff;
-
-  /* iOS System Colors */
-  --ios-blue: #007aff;
-  --ios-red: #ff3b30;
-  --ios-green: #34c759;
-  --ios-orange: #ff9500;
-  --ios-purple: #af52de;
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.005 90);
+  --foreground: oklch(0.18 0.015 60);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.015 60);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.015 60);
+  --primary: oklch(0.28 0.02 60);
+  --primary-foreground: oklch(0.985 0.005 90);
+  --secondary: oklch(0.95 0.01 80);
+  --secondary-foreground: oklch(0.28 0.02 60);
+  --muted: oklch(0.95 0.01 80);
+  --muted-foreground: oklch(0.5 0.015 60);
+  --accent: oklch(0.7 0.13 50);
+  --accent-foreground: oklch(0.985 0.005 90);
+  --today: oklch(0.7 0.13 50);
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.985 0.005 90);
+  --border: oklch(0.9 0.01 80);
+  --input: oklch(0.9 0.01 80);
+  --ring: oklch(0.7 0.13 50);
 }
 
-/* ── Dark Mode (iOS style) ──────────────────────────────── */
 .dark {
-  --background: #000000;
-  --foreground: #f2f2f7;
-  --card: #1c1c1e;
-  --card-foreground: #f2f2f7;
-  --popover: #2c2c2e;
-  --popover-foreground: #f2f2f7;
-  --primary: #0a84ff;
-  --primary-foreground: #ffffff;
-  --secondary: #2c2c2e;
-  --secondary-foreground: #f2f2f7;
-  --muted: #2c2c2e;
-  --muted-foreground: #8e8e93;
-  --accent: #0a84ff;
-  --accent-foreground: #ffffff;
-  --destructive: #ff453a;
-  --destructive-foreground: #ffffff;
-  --border: #38383a;
-  --input: #2c2c2e;
-  --ring: #0a84ff;
-
-  --ios-blue: #0a84ff;
-  --ios-red: #ff453a;
-  --ios-green: #30d158;
-  --ios-orange: #ff9f0a;
-  --ios-purple: #bf5af2;
+  --background: oklch(0.16 0.01 60);
+  --foreground: oklch(0.96 0.005 90);
+  --card: oklch(0.21 0.012 60);
+  --card-foreground: oklch(0.96 0.005 90);
+  --popover: oklch(0.21 0.012 60);
+  --popover-foreground: oklch(0.96 0.005 90);
+  --primary: oklch(0.96 0.005 90);
+  --primary-foreground: oklch(0.18 0.015 60);
+  --secondary: oklch(0.26 0.012 60);
+  --secondary-foreground: oklch(0.96 0.005 90);
+  --muted: oklch(0.26 0.012 60);
+  --muted-foreground: oklch(0.65 0.015 60);
+  --accent: oklch(0.72 0.14 50);
+  --accent-foreground: oklch(0.16 0.01 60);
+  --today: oklch(0.72 0.14 50);
+  --destructive: oklch(0.65 0.2 25);
+  --destructive-foreground: oklch(0.96 0.005 90);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.72 0.14 50);
 }
 
 @layer base {
@@ -106,57 +90,10 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv11", "ss01";
   }
-}
-
-/* ── iOS-style animations ───────────────────────────────── */
-@keyframes ios-slide-up {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -45%) scale(0.96);
+  .font-display {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
   }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-@keyframes ios-slide-down {
-  from {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translate(-50%, -45%) scale(0.96);
-  }
-}
-
-@keyframes ios-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes ios-fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-/* ── Scrollbar (minimal iOS style) ──────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-muted-foreground);
-  border-radius: 100px;
-  opacity: 0.3;
-}
-::-webkit-scrollbar-thumb:hover {
-  opacity: 0.5;
 }
