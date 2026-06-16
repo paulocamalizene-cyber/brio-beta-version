@@ -56,33 +56,33 @@ const CATEGORY_STYLES: Record<
 > = {
   work: {
     label: "Trabalho",
-    bar: "bg-[oklch(0.72_0.12_25)]",
-    bg: "bg-[oklch(0.72_0.12_25/0.18)]",
-    text: "text-[oklch(0.88_0.08_25)]",
+    bar: "bg-[#4285f4]",
+    bg: "bg-[#4285f4]/15",
+    text: "text-[#1967d2]",
   },
   personal: {
     label: "Pessoal",
-    bar: "bg-[oklch(0.78_0.12_85)]",
-    bg: "bg-[oklch(0.78_0.12_85/0.18)]",
-    text: "text-[oklch(0.9_0.08_85)]",
+    bar: "bg-[#ea4335]",
+    bg: "bg-[#ea4335]/15",
+    text: "text-[#c5221f]",
   },
   study: {
     label: "Estudo",
-    bar: "bg-[oklch(0.7_0.13_290)]",
-    bg: "bg-[oklch(0.7_0.13_290/0.2)]",
-    text: "text-[oklch(0.88_0.09_290)]",
+    bar: "bg-[#9c27b0]",
+    bg: "bg-[#9c27b0]/15",
+    text: "text-[#7b1fa2]",
   },
   health: {
     label: "Saúde",
-    bar: "bg-[oklch(0.75_0.13_160)]",
-    bg: "bg-[oklch(0.75_0.13_160/0.18)]",
-    text: "text-[oklch(0.88_0.09_160)]",
+    bar: "bg-[#34a853]",
+    bg: "bg-[#34a853]/15",
+    text: "text-[#188038]",
   },
   social: {
     label: "Social",
-    bar: "bg-[oklch(0.74_0.13_220)]",
-    bg: "bg-[oklch(0.74_0.13_220/0.18)]",
-    text: "text-[oklch(0.88_0.09_220)]",
+    bar: "bg-[#fbbc04]",
+    bg: "bg-[#fbbc04]/20",
+    text: "text-[#e37400]",
   },
 };
 
@@ -323,7 +323,8 @@ function CalendarApp() {
           </Button>
         </div>
         <Button
-          variant="ghost"
+          variant="outline"
+          className="rounded-full px-5 shadow-sm text-primary font-medium"
           size="sm"
           onClick={() => setSelected(new Date())}
         >
@@ -357,8 +358,8 @@ function CalendarApp() {
               </span>
               <span
                 className={[
-                  "font-display text-xl leading-none",
-                  today && !isSel ? "text-accent" : "",
+                  "font-display text-lg leading-none flex items-center justify-center w-8 h-8 rounded-full",
+                  isSel ? "bg-primary text-primary-foreground" : today ? "text-today font-bold" : "",
                 ].join(" ")}
               >
                 {format(d, "d")}
@@ -400,8 +401,8 @@ function CalendarApp() {
                 className="pointer-events-none absolute left-14 right-3 z-20 flex items-center"
                 style={{ top: (nowMin / 60) * HOUR_HEIGHT }}
               >
-                <span className="-ml-1.5 h-3 w-3 rounded-full bg-accent" />
-                <span className="h-px flex-1 bg-accent" />
+                <span className="-ml-1.5 h-3 w-3 rounded-full bg-today" />
+                <span className="h-px flex-1 bg-today" />
               </div>
             )}
 
