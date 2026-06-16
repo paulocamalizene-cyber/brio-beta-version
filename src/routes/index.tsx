@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/")(  {
   head: () => ({
     meta: [
       { title: "Agenda — Organização pessoal" },
@@ -47,42 +47,43 @@ type Event = {
 };
 
 const STORAGE_KEY = "calendar.events.v2";
-const HOUR_HEIGHT = 64;
+const HOUR_HEIGHT = 60;
 const DAY_MINUTES = 24 * 60;
 
+/* ── iOS-style category colors ──────────────────────────── */
 const CATEGORY_STYLES: Record<
   Category,
-  { label: string; bar: string; bg: string; text: string }
+  { label: string; color: string; bgLight: string; bgDark: string }
 > = {
   work: {
     label: "Trabalho",
-    bar: "bg-[oklch(0.72_0.12_25)]",
-    bg: "bg-[oklch(0.72_0.12_25/0.18)]",
-    text: "text-[oklch(0.88_0.08_25)]",
+    color: "#FF3B30",
+    bgLight: "rgba(255, 59, 48, 0.12)",
+    bgDark: "rgba(255, 69, 58, 0.20)",
   },
   personal: {
     label: "Pessoal",
-    bar: "bg-[oklch(0.78_0.12_85)]",
-    bg: "bg-[oklch(0.78_0.12_85/0.18)]",
-    text: "text-[oklch(0.9_0.08_85)]",
+    color: "#007AFF",
+    bgLight: "rgba(0, 122, 255, 0.12)",
+    bgDark: "rgba(10, 132, 255, 0.20)",
   },
   study: {
     label: "Estudo",
-    bar: "bg-[oklch(0.7_0.13_290)]",
-    bg: "bg-[oklch(0.7_0.13_290/0.2)]",
-    text: "text-[oklch(0.88_0.09_290)]",
+    color: "#AF52DE",
+    bgLight: "rgba(175, 82, 222, 0.12)",
+    bgDark: "rgba(191, 90, 242, 0.20)",
   },
   health: {
     label: "Saúde",
-    bar: "bg-[oklch(0.75_0.13_160)]",
-    bg: "bg-[oklch(0.75_0.13_160/0.18)]",
-    text: "text-[oklch(0.88_0.09_160)]",
+    color: "#34C759",
+    bgLight: "rgba(52, 199, 89, 0.12)",
+    bgDark: "rgba(48, 209, 88, 0.20)",
   },
   social: {
     label: "Social",
-    bar: "bg-[oklch(0.74_0.13_220)]",
-    bg: "bg-[oklch(0.74_0.13_220/0.18)]",
-    text: "text-[oklch(0.88_0.09_220)]",
+    color: "#FF9500",
+    bgLight: "rgba(255, 149, 0, 0.12)",
+    bgDark: "rgba(255, 159, 10, 0.20)",
   },
 };
 
@@ -96,6 +97,31 @@ const parseHM = (s: string) => {
   const [h, m] = s.split(":").map((n) => parseInt(n, 10));
   return (h || 0) * 60 + (m || 0);
 };
+
+/* ── Dark mode detection ────────────────────────────────── */
+function useIsDark() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const check = () => {
+      setDark(
+        document.documentElement.classList.contains("dark") || mq.matches,
+      );
+    };
+    check();
+    mq.addEventListener("change", check);
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => {
+      mq.removeEventListener("change", check);
+      obs.disconnect();
+    };
+  }, []);
+  return dark;
+}
 
 function CalendarApp() {
   const [selected, setSelected] = useState<Date>(new Date());
@@ -111,6 +137,8 @@ function CalendarApp() {
     end: "10:00",
     category: "personal" as Category,
   });
+
+  const isDark = useIsDark();
 
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -296,70 +324,79 @@ function CalendarApp() {
 
   return (
     <main className="flex h-screen flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
+      {/* ── iOS Navigation Bar ──────────────────────────── */}
+      <header
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: "0.5px solid var(--color-border)" }}
+      >
+        <div className="flex items-center gap-1">
+          <button
             onClick={() => setSelected((d) => addDays(d, -1))}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors duration-200 hover:bg-secondary active:bg-secondary/70"
             aria-label="Dia anterior"
           >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+            <ChevronLeft className="h-5 w-5" strokeWidth={2} />
+          </button>
           <button
             onClick={() => setSelected(new Date())}
-            className="font-display text-lg capitalize tracking-tight"
+            className="px-2 text-[17px] font-semibold capitalize tracking-tight text-foreground transition-opacity duration-200 hover:opacity-70"
           >
             {format(selected, "d 'de' MMMM", { locale: ptBR })}
           </button>
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={() => setSelected((d) => addDays(d, 1))}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors duration-200 hover:bg-secondary active:bg-secondary/70"
             aria-label="Próximo dia"
           >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+            <ChevronRight className="h-5 w-5" strokeWidth={2} />
+          </button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
           onClick={() => setSelected(new Date())}
+          className="rounded-full bg-primary/10 px-4 py-1.5 text-[13px] font-semibold text-primary transition-all duration-200 hover:bg-primary/20 active:scale-95"
         >
           Hoje
-        </Button>
+        </button>
       </header>
 
-      {/* Day strip */}
-      <div className="flex gap-1 overflow-x-auto border-b border-border/60 px-2 py-2">
+      {/* ── Day Strip (iOS style) ───────────────────────── */}
+      <div
+        className="flex items-center justify-around px-3 py-2"
+        style={{ borderBottom: "0.5px solid var(--color-border)" }}
+      >
         {stripDays.map((d) => {
           const isSel = isSameDay(d, selected);
-          const today = isSameDay(d, now);
+          const isToday = isSameDay(d, now);
           return (
             <button
               key={d.toISOString()}
               onClick={() => setSelected(d)}
-              className={[
-                "flex min-w-[56px] flex-1 flex-col items-center rounded-xl px-2 py-2 text-xs transition",
-                isSel
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-secondary",
-              ].join(" ")}
+              className="group flex flex-col items-center gap-1 px-1 py-1 transition-all duration-200"
             >
+              {/* Day name */}
               <span
-                className={[
-                  "uppercase tracking-widest",
-                  isSel ? "" : "text-muted-foreground",
-                ].join(" ")}
+                className="text-[11px] font-semibold uppercase tracking-wider transition-colors duration-200"
+                style={{
+                  color: isSel
+                    ? "var(--color-primary)"
+                    : isToday
+                      ? "var(--color-primary)"
+                      : "var(--color-muted-foreground)",
+                }}
               >
                 {format(d, "EEE", { locale: ptBR }).slice(0, 3)}
               </span>
+              {/* Day number */}
               <span
-                className={[
-                  "font-display text-xl leading-none",
-                  today && !isSel ? "text-accent" : "",
-                ].join(" ")}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[16px] font-medium transition-all duration-200"
+                style={{
+                  backgroundColor: isSel ? "var(--color-primary)" : "transparent",
+                  color: isSel
+                    ? "#ffffff"
+                    : isToday
+                      ? "var(--color-primary)"
+                      : "var(--color-foreground)",
+                }}
               >
                 {format(d, "d")}
               </span>
@@ -368,11 +405,12 @@ function CalendarApp() {
         })}
       </div>
 
-      {/* Agenda */}
+      {/* ── Timeline Grid ───────────────────────────────── */}
       <div className="relative flex-1 overflow-hidden">
         <div
           ref={gridRef}
           className="h-full overflow-y-auto"
+          style={{ scrollBehavior: "smooth" }}
           onPointerMove={onGesturePointerMove}
           onPointerUp={onGesturePointerUp}
         >
@@ -385,35 +423,63 @@ function CalendarApp() {
             {Array.from({ length: 24 }, (_, h) => (
               <div
                 key={h}
-                className="absolute left-0 right-0 border-t border-border/50"
-                style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+                className="absolute left-0 right-0"
+                style={{
+                  top: h * HOUR_HEIGHT,
+                  height: HOUR_HEIGHT,
+                  borderTop: "0.33px solid var(--color-border)",
+                }}
               >
-                <div className="absolute -top-2 left-0 w-14 pr-2 text-right text-[11px] tabular-nums text-muted-foreground">
+                <span
+                  className="absolute -top-[7px] left-0 w-[52px] pr-3 text-right text-[11px] font-light tabular-nums"
+                  style={{ color: "var(--color-muted-foreground)" }}
+                >
                   {h === 0 ? "" : `${String(h).padStart(2, "0")}:00`}
-                </div>
+                </span>
               </div>
             ))}
 
             {/* Now line */}
             {showNowLine && (
               <div
-                className="pointer-events-none absolute left-14 right-3 z-20 flex items-center"
-                style={{ top: (nowMin / 60) * HOUR_HEIGHT }}
+                className="pointer-events-none absolute z-20 flex items-center"
+                style={{
+                  top: (nowMin / 60) * HOUR_HEIGHT,
+                  left: 52,
+                  right: 12,
+                }}
               >
-                <span className="-ml-1.5 h-3 w-3 rounded-full bg-accent" />
-                <span className="h-px flex-1 bg-accent" />
+                <span
+                  className="shrink-0 rounded-full"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    backgroundColor: "#FF3B30",
+                    marginLeft: -4,
+                  }}
+                />
+                <span
+                  className="flex-1"
+                  style={{
+                    height: "1px",
+                    backgroundColor: "#FF3B30",
+                  }}
+                />
               </div>
             )}
 
             {/* Events */}
-            <div className="absolute inset-y-0 left-14 right-3">
+            <div
+              className="absolute inset-y-0"
+              style={{ left: 56, right: 12 }}
+            >
               {dayEvents.map((ev) => {
                 const isGhost = ghost?.id === ev.id;
                 const s = isGhost ? ghost!.start : ev.start;
                 const e = isGhost ? ghost!.end : ev.end;
                 const top = (s / 60) * HOUR_HEIGHT;
-                const height = Math.max(28, ((e - s) / 60) * HOUR_HEIGHT - 2);
-                const c = CATEGORY_STYLES[ev.category];
+                const height = Math.max(26, ((e - s) / 60) * HOUR_HEIGHT - 2);
+                const cat = CATEGORY_STYLES[ev.category];
                 return (
                   <div
                     key={ev.id}
@@ -423,19 +489,38 @@ function CalendarApp() {
                       ce.stopPropagation();
                       if (!movedRef.current) openEdit(ev);
                     }}
-                    className={[
-                      "absolute left-0 right-0 flex cursor-grab touch-none select-none overflow-hidden rounded-xl py-1.5 pl-2 pr-2 text-xs shadow-sm transition active:cursor-grabbing",
-                      c.bg,
-                      isGhost ? "z-10 ring-2 ring-accent/60" : "",
-                    ].join(" ")}
-                    style={{ top, height }}
+                    className="absolute left-0 right-0 flex cursor-grab touch-none select-none overflow-hidden rounded-lg transition-all duration-200 active:cursor-grabbing"
+                    style={{
+                      top,
+                      height,
+                      backgroundColor: isDark ? cat.bgDark : cat.bgLight,
+                      boxShadow: isGhost
+                        ? `0 0 0 2px ${cat.color}40`
+                        : "0 0.5px 1px rgba(0,0,0,0.04)",
+                      zIndex: isGhost ? 10 : 1,
+                    }}
                   >
-                    <span className={`mr-2 w-1 shrink-0 rounded-full ${c.bar}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className={`truncate font-medium ${c.text}`}>
+                    {/* Color bar */}
+                    <span
+                      className="shrink-0 rounded-full"
+                      style={{
+                        width: 3,
+                        backgroundColor: cat.color,
+                        margin: "4px 0 4px 3px",
+                      }}
+                    />
+                    {/* Content */}
+                    <div className="min-w-0 flex-1 px-2 py-1">
+                      <p
+                        className="truncate text-[13px] font-medium leading-tight"
+                        style={{ color: cat.color }}
+                      >
                         {ev.title}
                       </p>
-                      <p className="truncate text-[11px] tabular-nums text-muted-foreground">
+                      <p
+                        className="truncate text-[11px] tabular-nums"
+                        style={{ color: "var(--color-muted-foreground)" }}
+                      >
                         {minutesToLabel(s)} – {minutesToLabel(e)}
                       </p>
                     </div>
@@ -452,31 +537,39 @@ function CalendarApp() {
           </div>
         </div>
 
-        {/* FAB */}
-        <Button
-          size="icon"
+        {/* ── FAB (iOS style) ─────────────────────────── */}
+        <button
           onClick={() => openCreate(9 * 60)}
-          className="absolute bottom-5 right-5 h-14 w-14 rounded-full shadow-lg"
+          className="absolute bottom-6 right-6 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-primary text-white shadow-lg transition-all duration-200 hover:bg-primary/85 hover:shadow-xl active:scale-95"
           aria-label="Novo evento"
+          style={{
+            boxShadow: "0 4px 14px rgba(0, 122, 255, 0.35)",
+          }}
         >
-          <Plus className="h-6 w-6" />
-        </Button>
+          <Plus className="h-6 w-6" strokeWidth={2.5} />
+        </button>
       </div>
 
-      {/* Dialog */}
+      {/* ── Event Dialog (iOS Sheet style) ──────────────── */}
       <Dialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">
+            <DialogTitle className="text-[17px] font-semibold">
               {dialog?.mode === "edit" ? "Editar evento" : "Novo evento"}{" "}
-              <span className="text-muted-foreground">
+              <span className="text-muted-foreground font-normal">
                 · {format(selected, "d MMM", { locale: ptBR })}
               </span>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">Título</Label>
+            {/* Title */}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="title"
+                className="text-[13px] font-medium text-muted-foreground"
+              >
+                Título
+              </Label>
               <Input
                 id="title"
                 autoFocus
@@ -486,11 +579,18 @@ function CalendarApp() {
                   setDraft((d) => ({ ...d, title: e.target.value }))
                 }
                 onKeyDown={(e) => e.key === "Enter" && saveDraft()}
+                className="rounded-xl border-0 bg-secondary px-3 py-2.5 text-[15px] placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/30"
               />
             </div>
+            {/* Time */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="start">Início</Label>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="start"
+                  className="text-[13px] font-medium text-muted-foreground"
+                >
+                  Início
+                </Label>
                 <Input
                   id="start"
                   type="time"
@@ -498,10 +598,16 @@ function CalendarApp() {
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, start: e.target.value }))
                   }
+                  className="rounded-xl border-0 bg-secondary px-3 py-2.5 text-[15px] focus-visible:ring-2 focus-visible:ring-primary/30"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="end">Fim</Label>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="end"
+                  className="text-[13px] font-medium text-muted-foreground"
+                >
+                  Fim
+                </Label>
                 <Input
                   id="end"
                   type="time"
@@ -509,24 +615,40 @@ function CalendarApp() {
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, end: e.target.value }))
                   }
+                  className="rounded-xl border-0 bg-secondary px-3 py-2.5 text-[15px] focus-visible:ring-2 focus-visible:ring-primary/30"
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Categoria</Label>
+            {/* Category */}
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-medium text-muted-foreground">
+                Categoria
+              </Label>
               <Select
                 value={draft.category}
                 onValueChange={(v) =>
                   setDraft((d) => ({ ...d, category: v as Category }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl border-0 bg-secondary px-3 py-2.5 text-[15px] focus:ring-2 focus:ring-primary/30">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-0 bg-card shadow-xl">
                   {(Object.keys(CATEGORY_STYLES) as Category[]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {CATEGORY_STYLES[k].label}
+                    <SelectItem
+                      key={k}
+                      value={k}
+                      className="rounded-lg text-[15px]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{
+                            backgroundColor: CATEGORY_STYLES[k].color,
+                          }}
+                        />
+                        {CATEGORY_STYLES[k].label}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -535,24 +657,28 @@ function CalendarApp() {
           </div>
           <DialogFooter className="flex-row justify-between sm:justify-between">
             {dialog?.mode === "edit" ? (
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={deleteCurrent}
-                className="text-destructive hover:text-destructive"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[15px] font-medium text-destructive transition-all duration-200 hover:bg-destructive/10 active:scale-95"
               >
-                <Trash2 className="mr-1.5 h-4 w-4" /> Excluir
-              </Button>
+                <Trash2 className="h-4 w-4" /> Excluir
+              </button>
             ) : (
               <span />
             )}
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setDialog(null)}>
+              <button
+                onClick={() => setDialog(null)}
+                className="rounded-lg px-4 py-1.5 text-[15px] font-medium text-primary transition-all duration-200 hover:bg-primary/10 active:scale-95"
+              >
                 Cancelar
-              </Button>
-              <Button onClick={saveDraft}>
+              </button>
+              <button
+                onClick={saveDraft}
+                className="rounded-lg bg-primary px-5 py-1.5 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-primary/85 active:scale-95"
+              >
                 {dialog?.mode === "edit" ? "Salvar" : "Adicionar"}
-              </Button>
+              </button>
             </div>
           </DialogFooter>
         </DialogContent>
