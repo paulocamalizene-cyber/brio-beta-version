@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const Route = createFileRoute("/")(  {
+export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Agenda — Organização pessoal" },
