@@ -1,8 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addDays, format, isSameDay } from "date-fns";
+import {
+  addDays,
+  differenceInCalendarDays,
+  format,
+  isSameDay,
+  parseISO,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Search, Trash2 } from "lucide-react";
+import {
+  BarChart3,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Repeat,
+  Search,
+  Trash2,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +37,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,56 +67,61 @@ export const Route = createFileRoute("/")({
   component: CalendarApp,
 });
 
-type Category = "work" | "personal" | "study" | "health" | "social";
+// ───────────────────────── types ─────────────────────────
 
-type Event = {
+type Status = "done" | "missed" | "pending";
+
+type Freq =
+  | "none"
+  | "daily"
+  | "weekdays"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "yearly"
+  | "custom";
+
+type Recurrence = {
+  freq: Freq;
+  byWeekday?: number[]; // 0..6 (sun..sat), for custom
+  interval?: number; // for custom (every N units)
+  unit?: "day" | "week" | "month";
+  until?: string | null; // yyyy-MM-dd
+  count?: number | null;
+};
+
+type EventDef = {
   id: string;
-  date: string; // yyyy-MM-dd
+  date: string; // first occurrence yyyy-MM-dd
   title: string;
+  start: number; // minutes from midnight
+  end: number;
+  color: string; // hex
+  recurrence: Recurrence;
+  statuses?: Record<string, Status>; // per-occurrence date -> status
+  exceptions?: string[]; // dates removed from the series
+};
+
+type Occurrence = {
+  ev: EventDef;
+  date: string;
   start: number;
   end: number;
-  category: Category;
+  status: Status;
+  statusExplicit: boolean;
+  isPast: boolean;
+  isRecurring: boolean;
 };
 
-const STORAGE_KEY = "calendar.events.v2";
+const STORAGE_KEY = "calendar.events.v3";
+const FAV_KEY = "calendar.favColors.v1";
 const HOUR_HEIGHT = 56;
 const DAY_MINUTES = 24 * 60;
+const DEFAULT_COLOR = "#ef4444";
 
-const CATEGORY_STYLES: Record<
-  Category,
-  { label: string; color: string; bg: string; text: string }
-> = {
-  work: {
-    label: "Trabalho",
-    color: "oklch(0.62 0.22 27)", // red
-    bg: "oklch(0.62 0.22 27 / 0.12)",
-    text: "oklch(0.5 0.22 27)",
-  },
-  personal: {
-    label: "Pessoal",
-    color: "oklch(0.7 0.17 50)", // orange
-    bg: "oklch(0.7 0.17 50 / 0.12)",
-    text: "oklch(0.55 0.17 50)",
-  },
-  study: {
-    label: "Estudo",
-    color: "oklch(0.6 0.2 280)", // purple
-    bg: "oklch(0.6 0.2 280 / 0.12)",
-    text: "oklch(0.5 0.2 280)",
-  },
-  health: {
-    label: "Saúde",
-    color: "oklch(0.65 0.17 150)", // green
-    bg: "oklch(0.65 0.17 150 / 0.12)",
-    text: "oklch(0.5 0.17 150)",
-  },
-  social: {
-    label: "Social",
-    color: "oklch(0.65 0.16 235)", // blue
-    bg: "oklch(0.65 0.16 235 / 0.12)",
-    text: "oklch(0.5 0.16 235)",
-  },
-};
+const DEFAULT_RECURRENCE: Recurrence = { freq: "none" };
+
+// ───────────────────────── utils ─────────────────────────
 
 const minutesToLabel = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -97,17 +134,173 @@ const parseHM = (s: string) => {
   return (h || 0) * 60 + (m || 0);
 };
 
+const fmtKey = (d: Date) => format(d, "yyyy-MM-dd");
+
+function hexWithAlpha(hex: string, alpha: number) {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function readableText(hex: string) {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16) / 255;
+  const g = parseInt(n.slice(2, 4), 16) / 255;
+  const b = parseInt(n.slice(4, 6), 16) / 255;
+  const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return l > 0.6 ? "#1a1a1a" : "#ffffff";
+}
+
+// occurrence test for a given date relative to a series
+function occursOn(ev: EventDef, dateKey: string): boolean {
+  if (ev.exceptions?.includes(dateKey)) return false;
+  const start = parseISO(ev.date);
+  const target = parseISO(dateKey);
+  const diff = differenceInCalendarDays(target, start);
+  if (diff < 0) return false;
+  const r = ev.recurrence ?? DEFAULT_RECURRENCE;
+  // until / count windowing (count is best-effort: counts elapsed potential dates)
+  if (r.until) {
+    const until = parseISO(r.until);
+    if (differenceInCalendarDays(target, until) > 0) return false;
+  }
+  switch (r.freq) {
+    case "none":
+      return diff === 0;
+    case "daily":
+      return true;
+    case "weekdays": {
+      const w = target.getDay();
+      return w >= 1 && w <= 5;
+    }
+    case "weekly":
+      return diff % 7 === 0;
+    case "biweekly":
+      return diff % 14 === 0;
+    case "monthly":
+      return target.getDate() === start.getDate();
+    case "yearly":
+      return (
+        target.getDate() === start.getDate() &&
+        target.getMonth() === start.getMonth()
+      );
+    case "custom": {
+      const unit = r.unit ?? "week";
+      const interval = Math.max(1, r.interval ?? 1);
+      if (unit === "day") return diff % interval === 0;
+      if (unit === "week") {
+        const wd = target.getDay();
+        const days = r.byWeekday?.length ? r.byWeekday : [start.getDay()];
+        if (!days.includes(wd)) return false;
+        const weekDiff = Math.floor(diff / 7);
+        return weekDiff % interval === 0;
+      }
+      if (unit === "month") {
+        if (target.getDate() !== start.getDate()) return false;
+        const months =
+          (target.getFullYear() - start.getFullYear()) * 12 +
+          (target.getMonth() - start.getMonth());
+        return months % interval === 0;
+      }
+      return false;
+    }
+  }
+}
+
+function describeRecurrence(r: Recurrence): string {
+  switch (r.freq) {
+    case "none":
+      return "Não repete";
+    case "daily":
+      return "Todos os dias";
+    case "weekdays":
+      return "Dias úteis";
+    case "weekly":
+      return "Semanalmente";
+    case "biweekly":
+      return "Quinzenalmente";
+    case "monthly":
+      return "Mensalmente";
+    case "yearly":
+      return "Anualmente";
+    case "custom":
+      return `A cada ${r.interval ?? 1} ${
+        r.unit === "day" ? "dia(s)" : r.unit === "month" ? "mês(es)" : "semana(s)"
+      }`;
+  }
+}
+
+// Lane packing for overlapping events
+function layoutColumns(occs: Occurrence[]) {
+  const sorted = [...occs].sort(
+    (a, b) => a.start - b.start || a.end - b.end,
+  );
+  const result = new Map<string, { col: number; total: number }>();
+  let group: Occurrence[] = [];
+  let groupEnd = -1;
+  const flush = () => {
+    if (!group.length) return;
+    const cols: Occurrence[][] = [];
+    for (const ev of group) {
+      let placed = false;
+      for (let i = 0; i < cols.length; i++) {
+        const last = cols[i][cols[i].length - 1];
+        if (last.end <= ev.start) {
+          cols[i].push(ev);
+          result.set(keyOf(ev), { col: i, total: 0 });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        cols.push([ev]);
+        result.set(keyOf(ev), { col: cols.length - 1, total: 0 });
+      }
+    }
+    for (const ev of group) {
+      const r = result.get(keyOf(ev))!;
+      r.total = cols.length;
+    }
+    group = [];
+    groupEnd = -1;
+  };
+  for (const ev of sorted) {
+    if (group.length && ev.start >= groupEnd) flush();
+    group.push(ev);
+    groupEnd = Math.max(groupEnd, ev.end);
+  }
+  flush();
+  return result;
+}
+const keyOf = (o: Occurrence) => `${o.ev.id}|${o.date}`;
+
+// ───────────────────────── component ─────────────────────────
+
 function CalendarApp() {
   const [selected, setSelected] = useState<Date>(new Date());
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventDef[]>([]);
+  const [favColors, setFavColors] = useState<string[]>([]);
   const [dialog, setDialog] = useState<
-    { mode: "create" } | { mode: "edit"; event: Event } | null
+    | { mode: "create" }
+    | { mode: "edit"; ev: EventDef; occurrenceDate: string }
+    | null
   >(null);
+  const [editScope, setEditScope] = useState<"single" | "series">("series");
+  const [askScope, setAskScope] = useState<
+    null | { kind: "edit" | "delete"; ev: EventDef; date: string }
+  >(null);
+  const [statsOpen, setStatsOpen] = useState(false);
+
   const [draft, setDraft] = useState({
     title: "",
     start: "09:00",
     end: "10:00",
-    category: "personal" as Category,
+    color: DEFAULT_COLOR,
+    recurrence: { ...DEFAULT_RECURRENCE } as Recurrence,
   });
 
   const [now, setNow] = useState(new Date());
@@ -116,30 +309,67 @@ function CalendarApp() {
     return () => clearInterval(t);
   }, []);
 
+  // load
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setEvents(JSON.parse(raw));
+      const fav = localStorage.getItem(FAV_KEY);
+      if (fav) setFavColors(JSON.parse(fav));
     } catch {}
   }, []);
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
   }, [events]);
+  useEffect(() => {
+    localStorage.setItem(FAV_KEY, JSON.stringify(favColors));
+  }, [favColors]);
 
-  const selectedKey = format(selected, "yyyy-MM-dd");
-  const dayEvents = useMemo(
-    () =>
-      events
-        .filter((e) => e.date === selectedKey)
-        .sort((a, b) => a.start - b.start),
-    [events, selectedKey],
-  );
+  const selectedKey = fmtKey(selected);
+
+  // Compute occurrences for selected day with auto-pending
+  const dayOccurrences: Occurrence[] = useMemo(() => {
+    const out: Occurrence[] = [];
+    const selDate = parseISO(selectedKey);
+    for (const ev of events) {
+      if (!occursOn(ev, selectedKey)) continue;
+      const explicit = ev.statuses?.[selectedKey];
+      const endDate = new Date(selDate);
+      endDate.setHours(0, 0, 0, 0);
+      endDate.setMinutes(ev.end);
+      const past = now.getTime() >= endDate.getTime();
+      let status: Status;
+      let statusExplicit = false;
+      if (explicit) {
+        status = explicit;
+        statusExplicit = true;
+      } else if (past) {
+        status = "pending";
+      } else {
+        status = "pending"; // future shows neutral indicator; treat as pending visually but not stored
+      }
+      out.push({
+        ev,
+        date: selectedKey,
+        start: ev.start,
+        end: ev.end,
+        status,
+        statusExplicit,
+        isPast: past,
+        isRecurring: ev.recurrence.freq !== "none",
+      });
+    }
+    return out;
+  }, [events, selectedKey, now]);
+
+  const layout = useMemo(() => layoutColumns(dayOccurrences), [dayOccurrences]);
 
   const stripDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(selected, i - 3)),
     [selected],
   );
 
+  // ── dialog ──
   function openCreate(startMin: number) {
     const s = snap(startMin);
     const e = Math.min(DAY_MINUTES, s + 60);
@@ -147,19 +377,35 @@ function CalendarApp() {
       title: "",
       start: minutesToLabel(s),
       end: minutesToLabel(e),
-      category: "personal",
+      color: DEFAULT_COLOR,
+      recurrence: { ...DEFAULT_RECURRENCE },
     });
+    setEditScope("series");
     setDialog({ mode: "create" });
   }
 
-  function openEdit(ev: Event) {
+  function openEdit(ev: EventDef, date: string) {
+    if (ev.recurrence.freq !== "none") {
+      setAskScope({ kind: "edit", ev, date });
+      return;
+    }
+    actuallyOpenEdit(ev, date, "series");
+  }
+
+  function actuallyOpenEdit(
+    ev: EventDef,
+    date: string,
+    scope: "single" | "series",
+  ) {
     setDraft({
       title: ev.title,
       start: minutesToLabel(ev.start),
       end: minutesToLabel(ev.end),
-      category: ev.category,
+      color: ev.color,
+      recurrence: scope === "single" ? { freq: "none" } : { ...ev.recurrence },
     });
-    setDialog({ mode: "edit", event: ev });
+    setEditScope(scope);
+    setDialog({ mode: "edit", ev, occurrenceDate: date });
   }
 
   function saveDraft() {
@@ -167,6 +413,7 @@ function CalendarApp() {
     const s = parseHM(draft.start);
     let e = parseHM(draft.end);
     if (e <= s) e = Math.min(DAY_MINUTES, s + 30);
+
     if (dialog.mode === "create") {
       setEvents((prev) => [
         ...prev,
@@ -176,36 +423,93 @@ function CalendarApp() {
           title: draft.title.trim(),
           start: s,
           end: e,
-          category: draft.category,
+          color: draft.color,
+          recurrence: draft.recurrence,
+          statuses: {},
+          exceptions: [],
         },
       ]);
     } else {
-      const id = dialog.event.id;
-      setEvents((prev) =>
-        prev.map((ev) =>
-          ev.id === id
-            ? {
-                ...ev,
-                title: draft.title.trim(),
-                start: s,
-                end: e,
-                category: draft.category,
-              }
-            : ev,
-        ),
-      );
+      const { ev, occurrenceDate } = dialog;
+      if (editScope === "single" && ev.recurrence.freq !== "none") {
+        // exclude this date from series, add a new standalone event
+        setEvents((prev) => [
+          ...prev.map((x) =>
+            x.id === ev.id
+              ? {
+                  ...x,
+                  exceptions: [...(x.exceptions ?? []), occurrenceDate],
+                }
+              : x,
+          ),
+          {
+            id: crypto.randomUUID(),
+            date: occurrenceDate,
+            title: draft.title.trim(),
+            start: s,
+            end: e,
+            color: draft.color,
+            recurrence: { freq: "none" },
+            statuses: {},
+            exceptions: [],
+          },
+        ]);
+      } else {
+        setEvents((prev) =>
+          prev.map((x) =>
+            x.id === ev.id
+              ? {
+                  ...x,
+                  title: draft.title.trim(),
+                  start: s,
+                  end: e,
+                  color: draft.color,
+                  recurrence: draft.recurrence,
+                }
+              : x,
+          ),
+        );
+      }
     }
     setDialog(null);
   }
 
   function deleteCurrent() {
     if (dialog?.mode !== "edit") return;
-    const id = dialog.event.id;
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+    const { ev, occurrenceDate } = dialog;
+    if (ev.recurrence.freq !== "none" && editScope === "single") {
+      setEvents((prev) =>
+        prev.map((x) =>
+          x.id === ev.id
+            ? { ...x, exceptions: [...(x.exceptions ?? []), occurrenceDate] }
+            : x,
+        ),
+      );
+    } else {
+      setEvents((prev) => prev.filter((x) => x.id !== ev.id));
+    }
     setDialog(null);
   }
 
-  // Drag / resize
+  function setStatus(ev: EventDef, date: string, status: Status | null) {
+    setEvents((prev) =>
+      prev.map((x) => {
+        if (x.id !== ev.id) return x;
+        const statuses = { ...(x.statuses ?? {}) };
+        if (status === null) delete statuses[date];
+        else statuses[date] = status;
+        return { ...x, statuses };
+      }),
+    );
+  }
+
+  function toggleFavColor(c: string) {
+    setFavColors((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [c, ...prev].slice(0, 12),
+    );
+  }
+
+  // ── Drag / resize (operates on the underlying series for non-recurring; for recurring, it shifts the whole series time) ──
   const gridRef = useRef<HTMLDivElement | null>(null);
   type Gesture =
     | { kind: "move"; id: string; grabOffset: number; duration: number }
@@ -223,22 +527,22 @@ function CalendarApp() {
     return ((clientY - rect.top + grid.scrollTop) / HOUR_HEIGHT) * 60;
   };
 
-  function onBlockPointerDown(e: React.PointerEvent, ev: Event) {
+  function onBlockPointerDown(e: React.PointerEvent, o: Occurrence) {
     e.stopPropagation();
     const min = pointerToMin(e.clientY);
     gestureRef.current = {
       kind: "move",
-      id: ev.id,
-      grabOffset: min - ev.start,
-      duration: ev.end - ev.start,
+      id: o.ev.id,
+      grabOffset: min - o.start,
+      duration: o.end - o.start,
     };
     movedRef.current = false;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
 
-  function onResizePointerDown(e: React.PointerEvent, ev: Event) {
+  function onResizePointerDown(e: React.PointerEvent, o: Occurrence) {
     e.stopPropagation();
-    gestureRef.current = { kind: "resize", id: ev.id, startMin: ev.start };
+    gestureRef.current = { kind: "resize", id: o.ev.id, startMin: o.start };
     movedRef.current = false;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
@@ -290,7 +594,7 @@ function CalendarApp() {
 
   return (
     <main className="flex h-screen flex-col bg-background text-foreground">
-      {/* Top bar — Apple style */}
+      {/* Top bar */}
       <header className="flex items-center justify-between px-4 pb-1 pt-3">
         <button
           onClick={() => setSelected((d) => addDays(d, -1))}
@@ -308,11 +612,14 @@ function CalendarApp() {
           {format(selected, "MMMM yyyy", { locale: ptBR })}
         </button>
         <div className="flex items-center gap-3 text-primary">
-          <Search className="h-5 w-5" strokeWidth={2.25} />
           <button
-            onClick={() => openCreate(9 * 60)}
-            aria-label="Novo evento"
+            onClick={() => setStatsOpen(true)}
+            aria-label="Estatísticas"
           >
+            <BarChart3 className="h-5 w-5" strokeWidth={2.25} />
+          </button>
+          <Search className="h-5 w-5" strokeWidth={2.25} />
+          <button onClick={() => openCreate(9 * 60)} aria-label="Novo evento">
             <Plus className="h-6 w-6" strokeWidth={2.25} />
           </button>
         </div>
@@ -358,7 +665,7 @@ function CalendarApp() {
         </div>
       </div>
 
-      {/* Day label bar — like Apple */}
+      {/* Day label bar */}
       <div className="border-y border-border bg-secondary/60 px-4 py-1.5">
         <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           {isTodaySel ? "Hoje" : format(selected, "EEEE", { locale: ptBR })}
@@ -372,7 +679,7 @@ function CalendarApp() {
       <div className="relative flex-1 overflow-hidden">
         <div
           ref={gridRef}
-          className="h-full overflow-y-auto"
+          className="h-full overflow-y-auto scroll-smooth"
           onPointerMove={onGesturePointerMove}
           onPointerUp={onGesturePointerUp}
         >
@@ -414,56 +721,42 @@ function CalendarApp() {
 
             {/* Events */}
             <div className="absolute inset-y-0 left-14 right-2">
-              {dayEvents.map((ev) => {
-                const isGhost = ghost?.id === ev.id;
-                const s = isGhost ? ghost!.start : ev.start;
-                const e = isGhost ? ghost!.end : ev.end;
+              {dayOccurrences.map((o) => {
+                const isGhost = ghost?.id === o.ev.id;
+                const s = isGhost ? ghost!.start : o.start;
+                const e = isGhost ? ghost!.end : o.end;
                 const top = (s / 60) * HOUR_HEIGHT;
                 const height = Math.max(
                   26,
                   ((e - s) / 60) * HOUR_HEIGHT - 2,
                 );
-                const c = CATEGORY_STYLES[ev.category];
+                const lay = layout.get(keyOf(o)) ?? { col: 0, total: 1 };
+                const widthPct = 100 / lay.total;
+                const leftPct = widthPct * lay.col;
+                const color = o.ev.color;
+                const bg = hexWithAlpha(color, 0.16);
+                const text = readableText(bg.replace(/rgba?\([^)]+\)/, color));
                 return (
-                  <div
-                    key={ev.id}
-                    data-event-block
-                    onPointerDown={(pe) => onBlockPointerDown(pe, ev)}
-                    onClick={(ce) => {
-                      ce.stopPropagation();
-                      if (!movedRef.current) openEdit(ev);
+                  <EventCard
+                    key={keyOf(o)}
+                    o={o}
+                    s={s}
+                    e={e}
+                    top={top}
+                    height={height}
+                    widthPct={widthPct}
+                    leftPct={leftPct}
+                    color={color}
+                    bg={bg}
+                    text={text}
+                    isGhost={isGhost}
+                    onPointerDown={onBlockPointerDown}
+                    onResizePointerDown={onResizePointerDown}
+                    onOpenEdit={() => {
+                      if (!movedRef.current) openEdit(o.ev, o.date);
                     }}
-                    className={[
-                      "absolute left-1 right-0 flex cursor-grab touch-none select-none overflow-hidden rounded-md py-1 pl-2 pr-2 text-xs transition active:cursor-grabbing",
-                      isGhost ? "z-10 ring-2 ring-primary/50" : "",
-                    ].join(" ")}
-                    style={{
-                      top,
-                      height,
-                      background: c.bg,
-                      borderLeft: `3px solid ${c.color}`,
-                    }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className="truncate text-[13px] font-semibold leading-tight"
-                        style={{ color: c.text }}
-                      >
-                        {ev.title}
-                      </p>
-                      <p
-                        className="truncate text-[11px] tabular-nums leading-tight"
-                        style={{ color: c.text, opacity: 0.8 }}
-                      >
-                        {minutesToLabel(s)} – {minutesToLabel(e)}
-                      </p>
-                    </div>
-                    <div
-                      onPointerDown={(pe) => onResizePointerDown(pe, ev)}
-                      onClick={(ce) => ce.stopPropagation()}
-                      className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
-                    />
-                  </div>
+                    onSetStatus={(st) => setStatus(o.ev, o.date, st)}
+                  />
                 );
               })}
             </div>
@@ -471,7 +764,7 @@ function CalendarApp() {
         </div>
       </div>
 
-      {/* Bottom bar — Apple-like */}
+      {/* Bottom bar */}
       <nav className="flex items-center justify-between border-t border-border bg-secondary/60 px-6 py-2 text-primary">
         <button
           onClick={() => setSelected(new Date())}
@@ -494,19 +787,90 @@ function CalendarApp() {
           </button>
         </div>
         <button
-          onClick={() => openCreate(9 * 60)}
+          onClick={() => setStatsOpen(true)}
           className="text-[15px] font-semibold"
         >
-          Caixa de entrada
+          Estatísticas
         </button>
       </nav>
 
-      {/* Dialog */}
+      {/* Scope picker for recurring */}
+      <AlertDialog
+        open={!!askScope}
+        onOpenChange={(o) => !o && setAskScope(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Evento recorrente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja {askScope?.kind === "delete" ? "excluir" : "editar"} apenas
+              este evento ou toda a série?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row justify-end gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!askScope) return;
+                if (askScope.kind === "edit") {
+                  actuallyOpenEdit(askScope.ev, askScope.date, "single");
+                } else {
+                  setEvents((prev) =>
+                    prev.map((x) =>
+                      x.id === askScope.ev.id
+                        ? {
+                            ...x,
+                            exceptions: [
+                              ...(x.exceptions ?? []),
+                              askScope.date,
+                            ],
+                          }
+                        : x,
+                    ),
+                  );
+                }
+                setAskScope(null);
+              }}
+            >
+              Apenas este
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                if (!askScope) return;
+                if (askScope.kind === "edit") {
+                  actuallyOpenEdit(askScope.ev, askScope.date, "series");
+                } else {
+                  setEvents((prev) =>
+                    prev.filter((x) => x.id !== askScope.ev.id),
+                  );
+                }
+                setAskScope(null);
+              }}
+            >
+              Toda a série
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stats dialog */}
+      <StatsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        events={events}
+        now={now}
+      />
+
+      {/* Create / edit dialog */}
       <Dialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">
-              {dialog?.mode === "edit" ? "Editar evento" : "Novo evento"}
+              {dialog?.mode === "edit"
+                ? editScope === "single"
+                  ? "Editar este evento"
+                  : "Editar série"
+                : "Novo evento"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -547,31 +911,201 @@ function CalendarApp() {
                 />
               </div>
             </div>
+
+            {/* Color */}
             <div className="space-y-2">
-              <Label>Calendário</Label>
+              <Label>Cor</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={draft.color}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, color: e.target.value }))
+                  }
+                  className="h-9 w-12 cursor-pointer rounded border border-border bg-transparent"
+                />
+                <Input
+                  value={draft.color}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, color: e.target.value }))
+                  }
+                  className="font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleFavColor(draft.color)}
+                >
+                  {favColors.includes(draft.color) ? "★" : "☆"}
+                </Button>
+              </div>
+              {favColors.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {favColors.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, color: c }))}
+                      className="h-6 w-6 rounded-full border border-border"
+                      style={{ background: c }}
+                      aria-label={`Cor ${c}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recurrence */}
+            <div className="space-y-2">
+              <Label>Repetição</Label>
               <Select
-                value={draft.category}
+                value={draft.recurrence.freq}
                 onValueChange={(v) =>
-                  setDraft((d) => ({ ...d, category: v as Category }))
+                  setDraft((d) => ({
+                    ...d,
+                    recurrence: {
+                      ...d.recurrence,
+                      freq: v as Freq,
+                      unit: v === "custom" ? d.recurrence.unit ?? "week" : d.recurrence.unit,
+                      interval:
+                        v === "custom" ? d.recurrence.interval ?? 1 : d.recurrence.interval,
+                    },
+                  }))
                 }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(CATEGORY_STYLES) as Category[]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ background: CATEGORY_STYLES[k].color }}
-                        />
-                        {CATEGORY_STYLES[k].label}
-                      </span>
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="none">Não repete</SelectItem>
+                  <SelectItem value="daily">Todos os dias</SelectItem>
+                  <SelectItem value="weekdays">Dias úteis</SelectItem>
+                  <SelectItem value="weekly">Semanalmente</SelectItem>
+                  <SelectItem value="biweekly">Quinzenalmente</SelectItem>
+                  <SelectItem value="monthly">Mensalmente</SelectItem>
+                  <SelectItem value="yearly">Anualmente</SelectItem>
+                  <SelectItem value="custom">Personalizada</SelectItem>
                 </SelectContent>
               </Select>
+
+              {draft.recurrence.freq === "custom" && (
+                <div className="space-y-2 rounded-md border border-border p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">A cada</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={draft.recurrence.interval ?? 1}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          recurrence: {
+                            ...d.recurrence,
+                            interval: Math.max(1, parseInt(e.target.value || "1", 10)),
+                          },
+                        }))
+                      }
+                      className="w-20"
+                    />
+                    <Select
+                      value={draft.recurrence.unit ?? "week"}
+                      onValueChange={(v) =>
+                        setDraft((d) => ({
+                          ...d,
+                          recurrence: {
+                            ...d.recurrence,
+                            unit: v as "day" | "week" | "month",
+                          },
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">Dias</SelectItem>
+                        <SelectItem value="week">Semanas</SelectItem>
+                        <SelectItem value="month">Meses</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {draft.recurrence.unit === "week" && (
+                    <div className="flex flex-wrap gap-1">
+                      {["D", "S", "T", "Q", "Q", "S", "S"].map((l, i) => {
+                        const active = draft.recurrence.byWeekday?.includes(i);
+                        return (
+                          <button
+                            type="button"
+                            key={i}
+                            onClick={() =>
+                              setDraft((d) => {
+                                const cur = d.recurrence.byWeekday ?? [];
+                                const next = cur.includes(i)
+                                  ? cur.filter((x) => x !== i)
+                                  : [...cur, i];
+                                return {
+                                  ...d,
+                                  recurrence: { ...d.recurrence, byWeekday: next },
+                                };
+                              })
+                            }
+                            className={[
+                              "h-8 w-8 rounded-full border text-xs font-medium",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border",
+                            ].join(" ")}
+                          >
+                            {l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {draft.recurrence.freq !== "none" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Termina em</Label>
+                    <Input
+                      type="date"
+                      value={draft.recurrence.until ?? ""}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          recurrence: {
+                            ...d.recurrence,
+                            until: e.target.value || null,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ocorrências</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="—"
+                      value={draft.recurrence.count ?? ""}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          recurrence: {
+                            ...d.recurrence,
+                            count: e.target.value
+                              ? Math.max(1, parseInt(e.target.value, 10))
+                              : null,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter className="flex-row justify-between sm:justify-between">
@@ -599,5 +1133,343 @@ function CalendarApp() {
         </DialogContent>
       </Dialog>
     </main>
+  );
+}
+
+// ───────────────────────── EventCard ─────────────────────────
+
+function StatusBadge({ status }: { status: Status }) {
+  if (status === "done")
+    return (
+      <span
+        className="flex h-5 w-5 items-center justify-center rounded-full"
+        style={{ background: "#22c55e", color: "white" }}
+        aria-label="Concluído"
+      >
+        <Check className="h-3 w-3" strokeWidth={3} />
+      </span>
+    );
+  if (status === "missed")
+    return (
+      <span
+        className="flex h-5 w-5 items-center justify-center rounded-full"
+        style={{ background: "#ef4444", color: "white" }}
+        aria-label="Não realizado"
+      >
+        <X className="h-3 w-3" strokeWidth={3} />
+      </span>
+    );
+  return (
+    <span
+      className="flex h-5 w-5 items-center justify-center rounded-full"
+      style={{ background: "#eab308", color: "white" }}
+      aria-label="Pendente"
+    >
+      <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
+    </span>
+  );
+}
+
+function EventCard(props: {
+  o: Occurrence;
+  s: number;
+  e: number;
+  top: number;
+  height: number;
+  widthPct: number;
+  leftPct: number;
+  color: string;
+  bg: string;
+  text: string;
+  isGhost: boolean;
+  onPointerDown: (e: React.PointerEvent, o: Occurrence) => void;
+  onResizePointerDown: (e: React.PointerEvent, o: Occurrence) => void;
+  onOpenEdit: () => void;
+  onSetStatus: (s: Status | null) => void;
+}) {
+  const {
+    o,
+    s,
+    e,
+    top,
+    height,
+    widthPct,
+    leftPct,
+    color,
+    bg,
+    isGhost,
+    onPointerDown,
+    onResizePointerDown,
+    onOpenEdit,
+    onSetStatus,
+  } = props;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const text = readableText(color);
+  const showStatus = o.statusExplicit || o.isPast;
+  return (
+    <div
+      data-event-block
+      onPointerDown={(pe) => onPointerDown(pe, o)}
+      onClick={(ce) => {
+        ce.stopPropagation();
+        onOpenEdit();
+      }}
+      className={[
+        "absolute flex cursor-grab touch-none select-none overflow-hidden rounded-xl py-1 pl-2 pr-1.5 text-xs transition active:cursor-grabbing",
+        isGhost ? "z-10 ring-2 ring-primary/50" : "",
+      ].join(" ")}
+      style={{
+        top,
+        height,
+        left: `calc(${leftPct}% + 2px)`,
+        width: `calc(${widthPct}% - 4px)`,
+        background: bg,
+        borderLeft: `3px solid ${color}`,
+        color: text,
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1">
+          <p
+            className="truncate text-[13px] font-semibold leading-tight"
+            style={{ color }}
+          >
+            {o.ev.title}
+          </p>
+          {o.isRecurring && (
+            <Repeat
+              className="h-3 w-3 shrink-0 opacity-70"
+              style={{ color }}
+            />
+          )}
+        </div>
+        <p
+          className="truncate text-[11px] tabular-nums leading-tight opacity-80"
+          style={{ color }}
+        >
+          {minutesToLabel(s)} – {minutesToLabel(e)}
+        </p>
+      </div>
+      {showStatus && (
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
+            <button
+              onClick={(ev) => {
+                ev.stopPropagation();
+                setMenuOpen(true);
+              }}
+              onPointerDown={(ev) => ev.stopPropagation()}
+              className="ml-1 shrink-0 self-start"
+              aria-label="Estado"
+            >
+              <StatusBadge status={o.status} />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-44 p-1"
+            onClick={(ev) => ev.stopPropagation()}
+            onPointerDown={(ev) => ev.stopPropagation()}
+          >
+            <button
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary"
+              onClick={() => {
+                onSetStatus("done");
+                setMenuOpen(false);
+              }}
+            >
+              <StatusBadge status="done" /> Concluído
+            </button>
+            <button
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary"
+              onClick={() => {
+                onSetStatus("missed");
+                setMenuOpen(false);
+              }}
+            >
+              <StatusBadge status="missed" /> Não realizado
+            </button>
+            <button
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary"
+              onClick={() => {
+                onSetStatus(null);
+                setMenuOpen(false);
+              }}
+            >
+              <StatusBadge status="pending" /> Pendente
+            </button>
+          </PopoverContent>
+        </Popover>
+      )}
+      <div
+        onPointerDown={(pe) => onResizePointerDown(pe, o)}
+        onClick={(ce) => ce.stopPropagation()}
+        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
+      />
+    </div>
+  );
+}
+
+// ───────────────────────── Stats ─────────────────────────
+
+function StatsDialog({
+  open,
+  onOpenChange,
+  events,
+  now,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  events: EventDef[];
+  now: Date;
+}) {
+  const stats = useMemo(() => {
+    let done = 0,
+      missed = 0,
+      pending = 0,
+      total = 0;
+    const daySet = new Set<string>();
+    const doneDays = new Set<string>();
+    const earliest = events.reduce<Date | null>((min, ev) => {
+      const d = parseISO(ev.date);
+      return !min || d < min ? d : min;
+    }, null);
+    if (!earliest) return { done, missed, pending, total, rate: 0, streak: 0, weekRate: 0, days: 0 };
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const startDay = new Date(earliest);
+    startDay.setHours(0, 0, 0, 0);
+    for (
+      let d = new Date(startDay);
+      d <= today;
+      d = addDays(d, 1)
+    ) {
+      const key = fmtKey(d);
+      let dayDone = false;
+      let dayHas = false;
+      for (const ev of events) {
+        if (!occursOn(ev, key)) continue;
+        // end datetime for the occurrence
+        const endDT = new Date(d);
+        endDT.setHours(0, 0, 0, 0);
+        endDT.setMinutes(ev.end);
+        if (endDT.getTime() > now.getTime()) continue; // not finished yet
+        dayHas = true;
+        total++;
+        const st = ev.statuses?.[key];
+        if (st === "done") {
+          done++;
+          dayDone = true;
+        } else if (st === "missed") {
+          missed++;
+        } else {
+          pending++;
+        }
+      }
+      if (dayHas) daySet.add(key);
+      if (dayDone) doneDays.add(key);
+    }
+    const rate = total ? (done / total) * 100 : 0;
+    // streak: consecutive days ending at today (or yesterday) where day had events and at least one done
+    let streak = 0;
+    for (let d = new Date(today); ; d = addDays(d, -1)) {
+      const k = fmtKey(d);
+      if (!daySet.has(k)) {
+        if (streak === 0 && k === fmtKey(today)) continue; // skip today if no events
+        break;
+      }
+      if (doneDays.has(k)) streak++;
+      else break;
+    }
+    // week rate: last 7 days
+    let wDone = 0,
+      wTotal = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(today, -i);
+      const key = fmtKey(d);
+      for (const ev of events) {
+        if (!occursOn(ev, key)) continue;
+        const endDT = new Date(d);
+        endDT.setHours(0, 0, 0, 0);
+        endDT.setMinutes(ev.end);
+        if (endDT.getTime() > now.getTime()) continue;
+        wTotal++;
+        if (ev.statuses?.[key] === "done") wDone++;
+      }
+    }
+    const weekRate = wTotal ? (wDone / wTotal) * 100 : 0;
+    return {
+      done,
+      missed,
+      pending,
+      total,
+      rate,
+      streak,
+      weekRate,
+      days: daySet.size,
+    };
+  }, [events, now]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">
+            Estatísticas
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 py-2">
+          <StatCard
+            label="Taxa de conclusão"
+            value={`${stats.rate.toFixed(0)}%`}
+          />
+          <StatCard
+            label="Consistência semanal"
+            value={`${stats.weekRate.toFixed(0)}%`}
+          />
+          <StatCard label="Sequência" value={`${stats.streak} d`} />
+          <StatCard label="Dias com eventos" value={`${stats.days}`} />
+          <StatCard
+            label="Concluídos"
+            value={`${stats.done}`}
+            color="#22c55e"
+          />
+          <StatCard
+            label="Não realizados"
+            value={`${stats.missed}`}
+            color="#ef4444"
+          />
+          <StatCard
+            label="Pendentes"
+            value={`${stats.pending}`}
+            color="#eab308"
+          />
+          <StatCard label="Total" value={`${stats.total}`} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-secondary/40 p-3">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className="font-display text-2xl font-semibold tabular-nums"
+        style={color ? { color } : undefined}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
