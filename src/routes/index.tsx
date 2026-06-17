@@ -100,6 +100,9 @@ type EventDef = {
   recurrence: Recurrence;
   statuses?: Record<string, Status>; // per-occurrence date -> status
   exceptions?: string[]; // dates removed from the series
+  kind?: "informative" | "report"; // informational or requires report
+  notifications?: number[];
+  notes?: string;
 };
 
 type Occurrence = {
@@ -333,21 +336,27 @@ function CalendarApp() {
     const selDate = parseISO(selectedKey);
     for (const ev of events) {
       if (!occursOn(ev, selectedKey)) continue;
-      const explicit = ev.statuses?.[selectedKey];
+        const explicit = ev.statuses?.[selectedKey];
       const endDate = new Date(selDate);
       endDate.setHours(0, 0, 0, 0);
       endDate.setMinutes(ev.end);
       const past = now.getTime() >= endDate.getTime();
       let status: Status;
       let statusExplicit = false;
-      if (explicit) {
-        status = explicit;
-        statusExplicit = true;
-      } else if (past) {
-        status = "pending";
-      } else {
-        status = "pending"; // future shows neutral indicator; treat as pending visually but not stored
-      }
+        if (ev.kind && ev.kind !== "report") {
+          // informative events don't require reporting; keep as done for stats but not marked explicitly
+          status = "done";
+          statusExplicit = false;
+        } else {
+          if (explicit) {
+            status = explicit;
+            statusExplicit = true;
+          } else if (past) {
+            status = "pending";
+          } else {
+            status = "pending"; // future shows neutral indicator; treat as pending visually but not stored
+          }
+        }
       out.push({
         ev,
         date: selectedKey,
@@ -379,6 +388,9 @@ function CalendarApp() {
       end: minutesToLabel(e),
       color: DEFAULT_COLOR,
       recurrence: { ...DEFAULT_RECURRENCE },
+      kind: "informative",
+      notifications: [],
+      notes: "",
     });
     setEditScope("series");
     setDialog({ mode: "create" });
@@ -403,6 +415,9 @@ function CalendarApp() {
       end: minutesToLabel(ev.end),
       color: ev.color,
       recurrence: scope === "single" ? { freq: "none" } : { ...ev.recurrence },
+      kind: ev.kind ?? "informative",
+      notifications: ev.notifications ?? [],
+      notes: ev.notes ?? "",
     });
     setEditScope(scope);
     setDialog({ mode: "edit", ev, occurrenceDate: date });
@@ -427,6 +442,9 @@ function CalendarApp() {
           recurrence: draft.recurrence,
           statuses: {},
           exceptions: [],
+          kind: draft.kind,
+          notifications: draft.notifications,
+          notes: draft.notes,
         },
       ]);
     } else {
@@ -465,6 +483,9 @@ function CalendarApp() {
                   end: e,
                   color: draft.color,
                   recurrence: draft.recurrence,
+                  kind: draft.kind,
+                  notifications: draft.notifications,
+                  notes: draft.notes,
                 }
               : x,
           ),
@@ -912,6 +933,34 @@ function CalendarApp() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  value={draft.kind}
+                  onValueChange={(v) => setDraft((d) => ({ ...d, kind: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="informative">Informativo</SelectItem>
+                    <SelectItem value="report">Com relatório</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Notificações (min antes)</Label>
+                <Input
+                  placeholder="Ex.: 10,30"
+                  value={(draft.notifications || []).join(",")}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, notifications: e.target.value.split(",").map((s:any)=>parseInt(s||"0",10)).filter(Boolean) }))
+                  }
+                />
+              </div>
+            </div>
+
             {/* Color */}
             <div className="space-y-2">
               <Label>Cor</Label>
@@ -1205,7 +1254,7 @@ function EventCard(props: {
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const text = readableText(color);
-  const showStatus = o.statusExplicit || o.isPast;
+  const showStatus = (o.ev.kind === "report") && (o.statusExplicit || o.isPast);
   return (
     <div
       data-event-block
@@ -1348,6 +1397,7 @@ function StatsDialog({
       let dayHas = false;
       for (const ev of events) {
         if (!occursOn(ev, key)) continue;
+        if (ev.kind && ev.kind !== "report") continue;
         // end datetime for the occurrence
         const endDT = new Date(d);
         endDT.setHours(0, 0, 0, 0);
@@ -1387,6 +1437,7 @@ function StatsDialog({
       const d = addDays(today, -i);
       const key = fmtKey(d);
       for (const ev of events) {
+        if (ev.kind && ev.kind !== "report") continue;
         if (!occursOn(ev, key)) continue;
         const endDT = new Date(d);
         endDT.setHours(0, 0, 0, 0);
