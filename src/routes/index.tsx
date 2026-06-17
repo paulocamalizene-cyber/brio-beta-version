@@ -109,6 +109,7 @@ type Occurrence = {
   end: number;
   status: Status;
   statusExplicit: boolean;
+  isPast: boolean;
   isRecurring: boolean;
 };
 
