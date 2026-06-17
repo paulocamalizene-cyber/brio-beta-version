@@ -355,6 +355,7 @@ function CalendarApp() {
         end: ev.end,
         status,
         statusExplicit,
+        isPast: past,
         isRecurring: ev.recurrence.freq !== "none",
       });
     }
