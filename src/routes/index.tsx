@@ -1205,8 +1205,7 @@ function EventCard(props: {
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const text = readableText(color);
-  const showStatus =
-    o.statusExplicit || (o.status === "pending" && o.statusExplicit === false);
+  const showStatus = o.statusExplicit || o.isPast;
   return (
     <div
       data-event-block
