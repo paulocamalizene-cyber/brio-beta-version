@@ -389,6 +389,7 @@ function CalendarApp() {
     const e = Math.min(DAY_MINUTES, s + 60);
     setDraft({
       title: "",
+      date: selectedKey,
       start: minutesToLabel(s),
       end: minutesToLabel(e),
       color: DEFAULT_COLOR,
