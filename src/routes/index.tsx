@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
@@ -13,6 +13,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  MapPin,
   Plus,
   Repeat,
   Search,
@@ -20,6 +21,7 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
+import { geocodeAddress } from "@/lib/geocode.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,6 +93,12 @@ type Recurrence = {
   count?: number | null;
 };
 
+type EventLocation = {
+  address: string;
+  lat?: number;
+  lng?: number;
+};
+
 type EventDef = {
   id: string;
   date: string; // first occurrence yyyy-MM-dd
@@ -104,6 +112,7 @@ type EventDef = {
   kind?: "informative" | "report"; // informational or requires report
   notifications?: number[];
   notes?: string;
+  location?: EventLocation;
 };
 
 type Occurrence = {
@@ -309,7 +318,11 @@ function CalendarApp() {
     kind: "informative" as "informative" | "report",
     notifications: [] as number[],
     notes: "",
+    location: "",
+    locationCoords: null as { lat: number; lng: number } | null,
   });
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -397,7 +410,10 @@ function CalendarApp() {
       kind: "informative",
       notifications: [],
       notes: "",
+      location: "",
+      locationCoords: null,
     });
+    setGeocodeError(null);
     setEditScope("series");
     setDialog({ mode: "create" });
   }
@@ -425,9 +441,51 @@ function CalendarApp() {
       kind: ev.kind ?? "informative",
       notifications: ev.notifications ?? [],
       notes: ev.notes ?? "",
+      location: ev.location?.address ?? "",
+      locationCoords:
+        ev.location?.lat != null && ev.location?.lng != null
+          ? { lat: ev.location.lat, lng: ev.location.lng }
+          : null,
     });
+    setGeocodeError(null);
     setEditScope(scope);
     setDialog({ mode: "edit", ev, occurrenceDate: date });
+  }
+
+  async function runGeocode() {
+    const addr = draft.location.trim();
+    if (!addr) {
+      setDraft((d) => ({ ...d, locationCoords: null }));
+      setGeocodeError(null);
+      return;
+    }
+    setGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const r = await geocodeAddress({ data: { address: addr } });
+      if (r.ok) {
+        setDraft((d) => ({
+          ...d,
+          location: r.address,
+          locationCoords: { lat: r.lat, lng: r.lng },
+        }));
+      } else {
+        setGeocodeError("Endereço não encontrado");
+        setDraft((d) => ({ ...d, locationCoords: null }));
+      }
+    } catch (err) {
+      setGeocodeError("Falha ao localizar endereço");
+    } finally {
+      setGeocoding(false);
+    }
+  }
+
+  function buildLocation(): EventLocation | undefined {
+    const addr = draft.location.trim();
+    if (!addr) return undefined;
+    return draft.locationCoords
+      ? { address: addr, lat: draft.locationCoords.lat, lng: draft.locationCoords.lng }
+      : { address: addr };
   }
 
   function saveDraft() {
@@ -435,6 +493,7 @@ function CalendarApp() {
     const s = parseHM(draft.start);
     let e = parseHM(draft.end);
     if (e <= s) e = Math.min(DAY_MINUTES, s + 30);
+    const location = buildLocation();
 
     if (dialog.mode === "create") {
       setEvents((prev) => [
@@ -452,6 +511,7 @@ function CalendarApp() {
           kind: draft.kind,
           notifications: draft.notifications,
           notes: draft.notes,
+          location,
         },
       ]);
     } else {
@@ -477,6 +537,10 @@ function CalendarApp() {
             recurrence: { freq: "none" },
             statuses: {},
             exceptions: [],
+            kind: draft.kind,
+            notifications: draft.notifications,
+            notes: draft.notes,
+            location,
           },
         ]);
       } else {
@@ -494,6 +558,7 @@ function CalendarApp() {
                   kind: draft.kind,
                   notifications: draft.notifications,
                   notes: draft.notes,
+                  location,
                 }
               : x,
           ),
@@ -641,6 +706,9 @@ function CalendarApp() {
           {format(selected, "MMMM yyyy", { locale: ptBR })}
         </button>
         <div className="flex items-center gap-3 text-primary">
+          <Link to="/map" aria-label="Mapa">
+            <MapPin className="h-5 w-5" strokeWidth={2.25} />
+          </Link>
           <button
             onClick={() => setStatsOpen(true)}
             aria-label="Estatísticas"
@@ -1173,6 +1241,45 @@ function CalendarApp() {
                     />
                   </div>
                 </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Local</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="location"
+                  placeholder="Endereço ou nome do local"
+                  value={draft.location}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDraft((d) => ({
+                      ...d,
+                      location: v,
+                      locationCoords: null,
+                    }));
+                    setGeocodeError(null);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={runGeocode}
+                  disabled={geocoding || !draft.location.trim()}
+                >
+                  <MapPin className="mr-1.5 h-4 w-4" />
+                  {geocoding ? "..." : "Localizar"}
+                </Button>
+              </div>
+              {draft.locationCoords && (
+                <p className="text-xs text-muted-foreground">
+                  Coordenadas: {draft.locationCoords.lat.toFixed(4)},{" "}
+                  {draft.locationCoords.lng.toFixed(4)}
+                </p>
+              )}
+              {geocodeError && (
+                <p className="text-xs text-destructive">{geocodeError}</p>
               )}
             </div>
 
