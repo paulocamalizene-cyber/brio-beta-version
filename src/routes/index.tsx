@@ -706,6 +706,9 @@ function CalendarApp() {
           {format(selected, "MMMM yyyy", { locale: ptBR })}
         </button>
         <div className="flex items-center gap-3 text-primary">
+          <Link to="/map" aria-label="Mapa">
+            <MapPin className="h-5 w-5" strokeWidth={2.25} />
+          </Link>
           <button
             onClick={() => setStatsOpen(true)}
             aria-label="Estatísticas"
