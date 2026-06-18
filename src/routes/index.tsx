@@ -452,11 +452,48 @@ function CalendarApp() {
     setDialog({ mode: "edit", ev, occurrenceDate: date });
   }
 
+  async function runGeocode() {
+    const addr = draft.location.trim();
+    if (!addr) {
+      setDraft((d) => ({ ...d, locationCoords: null }));
+      setGeocodeError(null);
+      return;
+    }
+    setGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const r = await geocodeAddress({ data: { address: addr } });
+      if (r.ok) {
+        setDraft((d) => ({
+          ...d,
+          location: r.address,
+          locationCoords: { lat: r.lat, lng: r.lng },
+        }));
+      } else {
+        setGeocodeError("Endereço não encontrado");
+        setDraft((d) => ({ ...d, locationCoords: null }));
+      }
+    } catch (err) {
+      setGeocodeError("Falha ao localizar endereço");
+    } finally {
+      setGeocoding(false);
+    }
+  }
+
+  function buildLocation(): EventLocation | undefined {
+    const addr = draft.location.trim();
+    if (!addr) return undefined;
+    return draft.locationCoords
+      ? { address: addr, lat: draft.locationCoords.lat, lng: draft.locationCoords.lng }
+      : { address: addr };
+  }
+
   function saveDraft() {
     if (!draft.title.trim() || !dialog) return;
     const s = parseHM(draft.start);
     let e = parseHM(draft.end);
     if (e <= s) e = Math.min(DAY_MINUTES, s + 30);
+    const location = buildLocation();
 
     if (dialog.mode === "create") {
       setEvents((prev) => [
@@ -474,6 +511,7 @@ function CalendarApp() {
           kind: draft.kind,
           notifications: draft.notifications,
           notes: draft.notes,
+          location,
         },
       ]);
     } else {
@@ -499,6 +537,10 @@ function CalendarApp() {
             recurrence: { freq: "none" },
             statuses: {},
             exceptions: [],
+            kind: draft.kind,
+            notifications: draft.notifications,
+            notes: draft.notes,
+            location,
           },
         ]);
       } else {
@@ -516,6 +558,7 @@ function CalendarApp() {
                   kind: draft.kind,
                   notifications: draft.notifications,
                   notes: draft.notes,
+                  location,
                 }
               : x,
           ),
