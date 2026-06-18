@@ -93,6 +93,12 @@ type Recurrence = {
   count?: number | null;
 };
 
+type EventLocation = {
+  address: string;
+  lat?: number;
+  lng?: number;
+};
+
 type EventDef = {
   id: string;
   date: string; // first occurrence yyyy-MM-dd
@@ -106,6 +112,7 @@ type EventDef = {
   kind?: "informative" | "report"; // informational or requires report
   notifications?: number[];
   notes?: string;
+  location?: EventLocation;
 };
 
 type Occurrence = {
