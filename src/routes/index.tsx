@@ -945,7 +945,7 @@ function CalendarApp() {
                 <Label>Tipo</Label>
                 <Select
                   value={draft.kind}
-                  onValueChange={(v) => setDraft((d) => ({ ...d, kind: v }))}
+                  onValueChange={(v) => setDraft((d) => ({ ...d, kind: v as "informative" | "report" }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
