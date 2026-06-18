@@ -916,6 +916,17 @@ function CalendarApp() {
                 onKeyDown={(e) => e.key === "Enter" && saveDraft()}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Data</Label>
+              <Input
+                id="date"
+                type="date"
+                value={draft.date}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, date: e.target.value }))
+                }
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="start">Início</Label>
