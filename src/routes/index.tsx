@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -300,10 +301,14 @@ function CalendarApp() {
 
   const [draft, setDraft] = useState({
     title: "",
+    date: fmtKey(new Date()),
     start: "09:00",
     end: "10:00",
     color: DEFAULT_COLOR,
     recurrence: { ...DEFAULT_RECURRENCE } as Recurrence,
+    kind: "informative" as "informative" | "report",
+    notifications: [] as number[],
+    notes: "",
   });
 
   const [now, setNow] = useState(new Date());
@@ -384,6 +389,7 @@ function CalendarApp() {
     const e = Math.min(DAY_MINUTES, s + 60);
     setDraft({
       title: "",
+      date: selectedKey,
       start: minutesToLabel(s),
       end: minutesToLabel(e),
       color: DEFAULT_COLOR,
@@ -411,6 +417,7 @@ function CalendarApp() {
   ) {
     setDraft({
       title: ev.title,
+      date: scope === "single" ? date : ev.date,
       start: minutesToLabel(ev.start),
       end: minutesToLabel(ev.end),
       color: ev.color,
@@ -434,7 +441,7 @@ function CalendarApp() {
         ...prev,
         {
           id: crypto.randomUUID(),
-          date: selectedKey,
+          date: draft.date || selectedKey,
           title: draft.title.trim(),
           start: s,
           end: e,
@@ -478,6 +485,7 @@ function CalendarApp() {
             x.id === ev.id
               ? {
                   ...x,
+                  date: draft.date || x.date,
                   title: draft.title.trim(),
                   start: s,
                   end: e,
@@ -908,6 +916,17 @@ function CalendarApp() {
                 onKeyDown={(e) => e.key === "Enter" && saveDraft()}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Data</Label>
+              <Input
+                id="date"
+                type="date"
+                value={draft.date}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, date: e.target.value }))
+                }
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="start">Início</Label>
@@ -938,7 +957,7 @@ function CalendarApp() {
                 <Label>Tipo</Label>
                 <Select
                   value={draft.kind}
-                  onValueChange={(v) => setDraft((d) => ({ ...d, kind: v }))}
+                  onValueChange={(v) => setDraft((d) => ({ ...d, kind: v as "informative" | "report" }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1155,6 +1174,19 @@ function CalendarApp() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas</Label>
+              <Textarea
+                id="notes"
+                placeholder="Detalhes, lembretes, links..."
+                value={draft.notes}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, notes: e.target.value }))
+                }
+                rows={3}
+              />
             </div>
           </div>
           <DialogFooter className="flex-row justify-between sm:justify-between">
