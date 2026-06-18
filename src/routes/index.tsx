@@ -1175,6 +1175,19 @@ function CalendarApp() {
                 </div>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas</Label>
+              <Textarea
+                id="notes"
+                placeholder="Detalhes, lembretes, links..."
+                value={draft.notes}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, notes: e.target.value }))
+                }
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter className="flex-row justify-between sm:justify-between">
             {dialog?.mode === "edit" ? (
