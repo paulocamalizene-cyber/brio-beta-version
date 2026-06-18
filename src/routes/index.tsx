@@ -441,7 +441,7 @@ function CalendarApp() {
         ...prev,
         {
           id: crypto.randomUUID(),
-          date: selectedKey,
+          date: draft.date || selectedKey,
           title: draft.title.trim(),
           start: s,
           end: e,
