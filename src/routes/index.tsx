@@ -417,6 +417,7 @@ function CalendarApp() {
   ) {
     setDraft({
       title: ev.title,
+      date: scope === "single" ? date : ev.date,
       start: minutesToLabel(ev.start),
       end: minutesToLabel(ev.end),
       color: ev.color,
