@@ -1245,6 +1245,45 @@ function CalendarApp() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="location">Local</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="location"
+                  placeholder="Endereço ou nome do local"
+                  value={draft.location}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDraft((d) => ({
+                      ...d,
+                      location: v,
+                      locationCoords: null,
+                    }));
+                    setGeocodeError(null);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={runGeocode}
+                  disabled={geocoding || !draft.location.trim()}
+                >
+                  <MapPin className="mr-1.5 h-4 w-4" />
+                  {geocoding ? "..." : "Localizar"}
+                </Button>
+              </div>
+              {draft.locationCoords && (
+                <p className="text-xs text-muted-foreground">
+                  Coordenadas: {draft.locationCoords.lat.toFixed(4)},{" "}
+                  {draft.locationCoords.lng.toFixed(4)}
+                </p>
+              )}
+              {geocodeError && (
+                <p className="text-xs text-destructive">{geocodeError}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="notes">Notas</Label>
               <Textarea
                 id="notes"
