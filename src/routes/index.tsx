@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
@@ -13,6 +13,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  MapPin,
   Plus,
   Repeat,
   Search,
@@ -20,6 +21,7 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
+import { geocodeAddress } from "@/lib/geocode.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
