@@ -441,7 +441,13 @@ function CalendarApp() {
       kind: ev.kind ?? "informative",
       notifications: ev.notifications ?? [],
       notes: ev.notes ?? "",
+      location: ev.location?.address ?? "",
+      locationCoords:
+        ev.location?.lat != null && ev.location?.lng != null
+          ? { lat: ev.location.lat, lng: ev.location.lng }
+          : null,
     });
+    setGeocodeError(null);
     setEditScope(scope);
     setDialog({ mode: "edit", ev, occurrenceDate: date });
   }
