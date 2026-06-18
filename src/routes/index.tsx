@@ -485,6 +485,7 @@ function CalendarApp() {
             x.id === ev.id
               ? {
                   ...x,
+                  date: draft.date || x.date,
                   title: draft.title.trim(),
                   start: s,
                   end: e,
