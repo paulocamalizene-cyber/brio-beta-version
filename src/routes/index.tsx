@@ -301,10 +301,14 @@ function CalendarApp() {
 
   const [draft, setDraft] = useState({
     title: "",
+    date: fmtKey(new Date()),
     start: "09:00",
     end: "10:00",
     color: DEFAULT_COLOR,
     recurrence: { ...DEFAULT_RECURRENCE } as Recurrence,
+    kind: "informative" as "informative" | "report",
+    notifications: [] as number[],
+    notes: "",
   });
 
   const [now, setNow] = useState(new Date());
