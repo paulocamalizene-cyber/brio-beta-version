@@ -410,7 +410,10 @@ function CalendarApp() {
       kind: "informative",
       notifications: [],
       notes: "",
+      location: "",
+      locationCoords: null,
     });
+    setGeocodeError(null);
     setEditScope("series");
     setDialog({ mode: "create" });
   }
