@@ -318,7 +318,11 @@ function CalendarApp() {
     kind: "informative" as "informative" | "report",
     notifications: [] as number[],
     notes: "",
+    location: "",
+    locationCoords: null as { lat: number; lng: number } | null,
   });
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   const [now, setNow] = useState(new Date());
   useEffect(() => {
