@@ -771,7 +771,7 @@ function CalendarApp() {
       </div>
 
       {/* Agenda timeline */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))]">
         <div
           ref={gridRef}
           className="h-full overflow-y-auto scroll-smooth"
