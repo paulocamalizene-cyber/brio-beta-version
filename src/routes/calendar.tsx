@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BottomNav } from "@/components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
