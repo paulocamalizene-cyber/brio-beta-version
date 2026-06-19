@@ -419,7 +419,7 @@ function MapPage() {
 
         {/* Selected event card */}
         {selected && (
-          <div className="absolute bottom-4 left-4 right-4 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
+          <div className="absolute left-4 right-4 bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
             <div className="flex items-start gap-3">
               <span
                 className="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-full"
