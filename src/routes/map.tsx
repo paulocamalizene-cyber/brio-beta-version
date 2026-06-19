@@ -468,6 +468,7 @@ function MapPage() {
           </div>
         )}
       </div>
+      <BottomNav />
     </main>
   );
 }
