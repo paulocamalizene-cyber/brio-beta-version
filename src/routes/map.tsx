@@ -308,13 +308,9 @@ function MapPage() {
     <main className="relative flex h-screen flex-col bg-background text-foreground">
       {/* Top bar */}
       <header className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur">
-        <Link
-          to="/"
-          aria-label="Voltar"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-primary hover:bg-accent"
-        >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
+        <div className="flex h-9 items-center px-1 font-display text-base font-semibold">
+          Mapa
+        </div>
         <form onSubmit={runSearch} className="flex-1">
           <Input
             value={search}
