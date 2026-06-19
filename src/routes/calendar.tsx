@@ -1317,6 +1317,7 @@ function CalendarApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <BottomNav />
     </main>
   );
 }
