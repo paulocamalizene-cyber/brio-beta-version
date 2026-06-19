@@ -56,7 +56,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/calendar")({
   head: () => ({
     meta: [
       { title: "Calendário" },
