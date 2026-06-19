@@ -411,7 +411,7 @@ function MapPage() {
         {/* Floating locate button */}
         <button
           onClick={locateMe}
-          className="absolute bottom-24 right-4 flex h-11 w-11 items-center justify-center rounded-full bg-background shadow-lg ring-1 ring-border hover:bg-accent"
+          className="absolute right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] flex h-11 w-11 items-center justify-center rounded-full bg-background shadow-lg ring-1 ring-border hover:bg-accent"
           aria-label="Minha localização"
         >
           <LocateFixed className="h-5 w-5 text-primary" />
