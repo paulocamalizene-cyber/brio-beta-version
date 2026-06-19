@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, Layers, LocateFixed, MapPin, Navigation } from "lucide-react";
+import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
