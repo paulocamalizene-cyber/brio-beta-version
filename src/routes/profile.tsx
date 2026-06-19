@@ -1,17 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Home | Agenda" },
-      { name: "description", content: "Página inicial do seu app de agenda." },
+      { title: "Perfil | Agenda" },
+      { name: "description", content: "Sua área de perfil." },
     ],
   }),
-  component: HomePage,
+  component: ProfilePage,
 });
 
-function HomePage() {
+function ProfilePage() {
   return (
     <main
       className="flex min-h-screen flex-col bg-background text-foreground"
@@ -19,14 +19,14 @@ function HomePage() {
     >
       <header className="px-5 pb-3 pt-4">
         <h1 className="font-display text-3xl font-semibold tracking-tight">
-          Home
+          Perfil
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Bem-vindo de volta.
+          Em breve.
         </p>
       </header>
       <section className="flex-1 px-5">
-        {/* Estrutura preparada para futuros widgets. */}
+        {/* Estrutura preparada para futuras configurações. */}
       </section>
       <BottomNavSpacer />
       <BottomNav />

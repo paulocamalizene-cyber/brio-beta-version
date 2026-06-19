@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, Layers, LocateFixed, MapPin, Navigation } from "lucide-react";
+import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -307,13 +308,9 @@ function MapPage() {
     <main className="relative flex h-screen flex-col bg-background text-foreground">
       {/* Top bar */}
       <header className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur">
-        <Link
-          to="/"
-          aria-label="Voltar"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-primary hover:bg-accent"
-        >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
+        <div className="flex h-9 items-center px-1 font-display text-base font-semibold">
+          Mapa
+        </div>
         <form onSubmit={runSearch} className="flex-1">
           <Input
             value={search}
@@ -414,7 +411,7 @@ function MapPage() {
         {/* Floating locate button */}
         <button
           onClick={locateMe}
-          className="absolute bottom-24 right-4 flex h-11 w-11 items-center justify-center rounded-full bg-background shadow-lg ring-1 ring-border hover:bg-accent"
+          className="absolute right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] flex h-11 w-11 items-center justify-center rounded-full bg-background shadow-lg ring-1 ring-border hover:bg-accent"
           aria-label="Minha localização"
         >
           <LocateFixed className="h-5 w-5 text-primary" />
@@ -422,7 +419,7 @@ function MapPage() {
 
         {/* Selected event card */}
         {selected && (
-          <div className="absolute bottom-4 left-4 right-4 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
+          <div className="absolute left-4 right-4 bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
             <div className="flex items-start gap-3">
               <span
                 className="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-full"
@@ -471,6 +468,7 @@ function MapPage() {
           </div>
         )}
       </div>
+      <BottomNav />
     </main>
   );
 }
