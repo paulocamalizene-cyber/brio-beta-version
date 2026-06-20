@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, Layers, LocateFixed, MapPin, Navigation } from "lucide-react";
+import { Compass, Layers, LocateFixed, MapPin, Minus, Navigation, Plus } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 export const Route = createFileRoute("/map")({
   head: () => ({
@@ -33,7 +28,6 @@ export const Route = createFileRoute("/map")({
   component: MapPage,
 });
 
-// ---- Types mirroring those in routes/index.tsx ----
 type EventLocation = { address: string; lat?: number; lng?: number };
 type Recurrence = { freq: string };
 type EventDef = {
@@ -56,7 +50,6 @@ const minutesToLabel = (m: number) =>
 type MapType = "roadmap" | "satellite" | "hybrid" | "terrain";
 type Period = "day" | "week" | "month" | "all";
 
-// ── Google Maps script loader ──
 let mapsLoadingPromise: Promise<void> | null = null;
 function loadGoogleMaps(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
@@ -90,16 +83,19 @@ function MapPage() {
   const [mapType, setMapType] = useState<MapType>("roadmap");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showLayers, setShowLayers] = useState(false);
+  const [trafficOn, setTrafficOn] = useState(false);
+  const [heading, setHeading] = useState(0);
+  const [tilt, setTilt] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const trafficRef = useRef<any>(null);
-  const [trafficOn, setTrafficOn] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load events from localStorage + listen to changes
+  // Load events
   useEffect(() => {
     const read = () => {
       try {
@@ -121,21 +117,36 @@ function MapPage() {
     };
   }, []);
 
-  // Init the map
+  // Init map
   useEffect(() => {
     let cancelled = false;
     loadGoogleMaps()
       .then(() => {
         if (cancelled || !containerRef.current) return;
         const google = (window as any).google;
-        mapRef.current = new google.maps.Map(containerRef.current, {
-          center: { lat: -23.5505, lng: -46.6333 }, // São Paulo as a fallback
+        const map = new google.maps.Map(containerRef.current, {
+          center: { lat: -23.5505, lng: -46.6333 },
           zoom: 12,
           mapTypeId: mapType,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
-          zoomControl: true,
+          zoomControl: false,
+          rotateControl: false,
+          scaleControl: false,
+          gestureHandling: "greedy",
+          isFractionalZoomEnabled: true,
+          tilt: 0,
+          heading: 0,
+          clickableIcons: false,
+          keyboardShortcuts: false,
+        });
+        mapRef.current = map;
+        map.addListener("heading_changed", () => {
+          setHeading(map.getHeading() || 0);
+        });
+        map.addListener("tilt_changed", () => {
+          setTilt(map.getTilt() || 0);
         });
         setReady(true);
       })
@@ -149,12 +160,43 @@ function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply map type changes
+  // One-finger rotate/tilt: two-finger gestures already handled by Google,
+  // but we add an "Adjust view" overlay activated by long-press to allow
+  // single-finger rotate (drag horizontally) + tilt (drag vertically).
+  const adjustingRef = useRef(false);
+  const adjustStartRef = useRef<{ x: number; y: number; h: number; t: number } | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
+
+  function startAdjust(clientX: number, clientY: number) {
+    if (!mapRef.current) return;
+    adjustingRef.current = true;
+    setAdjusting(true);
+    adjustStartRef.current = {
+      x: clientX,
+      y: clientY,
+      h: mapRef.current.getHeading() || 0,
+      t: mapRef.current.getTilt() || 0,
+    };
+  }
+  function moveAdjust(clientX: number, clientY: number) {
+    if (!adjustingRef.current || !adjustStartRef.current || !mapRef.current) return;
+    const dx = clientX - adjustStartRef.current.x;
+    const dy = clientY - adjustStartRef.current.y;
+    const newHeading = (adjustStartRef.current.h + dx * 0.6) % 360;
+    const newTilt = Math.max(0, Math.min(67.5, adjustStartRef.current.t - dy * 0.3));
+    mapRef.current.setHeading(newHeading < 0 ? newHeading + 360 : newHeading);
+    mapRef.current.setTilt(newTilt);
+  }
+  function endAdjust() {
+    adjustingRef.current = false;
+    setAdjusting(false);
+    adjustStartRef.current = null;
+  }
+
   useEffect(() => {
     if (mapRef.current) mapRef.current.setMapTypeId(mapType);
   }, [mapType]);
 
-  // Traffic layer toggle
   useEffect(() => {
     if (!ready) return;
     const google = (window as any).google;
@@ -166,28 +208,21 @@ function MapPage() {
     }
   }, [trafficOn, ready]);
 
-  // Available colors for filter
   const availableColors = useMemo(() => {
     const set = new Set<string>();
     events.forEach((e) => set.add(e.color));
     return Array.from(set);
   }, [events]);
 
-  // Filter events by period & color
   const filteredEvents = useMemo(() => {
     const now = new Date();
     let interval: { start: Date; end: Date } | null = null;
     if (period === "day") {
-      const s = new Date(now);
-      s.setHours(0, 0, 0, 0);
-      const e = new Date(now);
-      e.setHours(23, 59, 59, 999);
+      const s = new Date(now); s.setHours(0, 0, 0, 0);
+      const e = new Date(now); e.setHours(23, 59, 59, 999);
       interval = { start: s, end: e };
     } else if (period === "week") {
-      interval = {
-        start: startOfWeek(now, { weekStartsOn: 0 }),
-        end: endOfWeek(now, { weekStartsOn: 0 }),
-      };
+      interval = { start: startOfWeek(now, { weekStartsOn: 0 }), end: endOfWeek(now, { weekStartsOn: 0 }) };
     } else if (period === "month") {
       interval = { start: startOfMonth(now), end: endOfMonth(now) };
     }
@@ -205,7 +240,6 @@ function MapPage() {
     [filteredEvents, selectedId],
   );
 
-  // Render markers
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     const google = (window as any).google;
@@ -219,38 +253,26 @@ function MapPage() {
       seen.add(key);
       let marker = markersRef.current.get(key);
       const pos = { lat: loc.lat!, lng: loc.lng! };
+      const icon = {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 9,
+        fillColor: ev.color,
+        fillOpacity: 1,
+        strokeColor: "#fff",
+        strokeWeight: 2,
+      };
       if (!marker) {
-        marker = new google.maps.Marker({
-          position: pos,
-          map,
-          title: ev.title,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 9,
-            fillColor: ev.color,
-            fillOpacity: 1,
-            strokeColor: "#fff",
-            strokeWeight: 2,
-          },
-        });
+        marker = new google.maps.Marker({ position: pos, map, title: ev.title, icon });
         marker.addListener("click", () => setSelectedId(ev.id));
         markersRef.current.set(key, marker);
       } else {
         marker.setPosition(pos);
         marker.setTitle(ev.title);
-        marker.setIcon({
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 9,
-          fillColor: ev.color,
-          fillOpacity: 1,
-          strokeColor: "#fff",
-          strokeWeight: 2,
-        });
+        marker.setIcon(icon);
       }
       bounds.extend(pos);
       any = true;
     }
-    // remove markers no longer present
     for (const [id, m] of markersRef.current) {
       if (!seen.has(id)) {
         m.setMap(null);
@@ -265,21 +287,31 @@ function MapPage() {
     }
   }, [filteredEvents, ready, selectedId]);
 
-  // Locate me
   function locateMe() {
     if (!ready || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         mapRef.current.setCenter(p);
-        mapRef.current.setZoom(14);
+        mapRef.current.setZoom(15);
       },
       () => {},
       { enableHighAccuracy: true, timeout: 8000 },
     );
   }
 
-  // Search via Geocoder
+  function zoomBy(delta: number) {
+    if (!mapRef.current) return;
+    const z = mapRef.current.getZoom() || 12;
+    mapRef.current.setZoom(Math.max(2, Math.min(21, z + delta)));
+  }
+
+  function resetNorth() {
+    if (!mapRef.current) return;
+    mapRef.current.setHeading(0);
+    mapRef.current.setTilt(0);
+  }
+
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
     const q = search.trim();
@@ -306,8 +338,11 @@ function MapPage() {
 
   return (
     <main className="relative flex h-screen flex-col bg-background text-foreground">
-      {/* Top bar */}
-      <header className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur">
+      {/* Compact top bar: title + search only. Layers moved into the map. */}
+      <header
+        className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur"
+        style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
+      >
         <div className="flex h-9 items-center px-1 font-display text-base font-semibold">
           Mapa
         </div>
@@ -319,42 +354,6 @@ function MapPage() {
             className="h-9"
           />
         </form>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 px-2">
-              <Layers className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-56 p-2">
-            <div className="space-y-1">
-              {([
-                { v: "roadmap", label: "🗺️ Padrão" },
-                { v: "satellite", label: "🛰️ Satélite" },
-                { v: "hybrid", label: "🌍 Híbrido" },
-                { v: "terrain", label: "🏔️ Terreno" },
-              ] as { v: MapType; label: string }[]).map((o) => (
-                <button
-                  key={o.v}
-                  onClick={() => setMapType(o.v)}
-                  className={`w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent ${
-                    mapType === o.v ? "bg-accent font-medium" : ""
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-              <div className="my-1 h-px bg-border" />
-              <button
-                onClick={() => setTrafficOn((v) => !v)}
-                className={`w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent ${
-                  trafficOn ? "bg-accent font-medium" : ""
-                }`}
-              >
-                🚗 Trânsito {trafficOn ? "(on)" : ""}
-              </button>
-            </div>
-          </PopoverContent>
-        </Popover>
       </header>
 
       {/* Filters */}
@@ -379,10 +378,7 @@ function MapPage() {
             {availableColors.map((c) => (
               <SelectItem key={c} value={c}>
                 <span className="inline-flex items-center gap-2">
-                  <span
-                    className="inline-block h-3 w-3 rounded-full"
-                    style={{ background: c }}
-                  />
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} />
                   {c}
                 </span>
               </SelectItem>
@@ -394,9 +390,10 @@ function MapPage() {
         </span>
       </div>
 
-      {/* Map container */}
-      <div className="relative flex-1">
+      {/* Map */}
+      <div className="relative flex-1 overflow-hidden">
         <div ref={containerRef} className="absolute inset-0" />
+
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
             {error}
@@ -408,33 +405,129 @@ function MapPage() {
           </div>
         )}
 
-        {/* Floating locate button */}
+        {/* Adjust-view overlay: when active, captures pointer to rotate/tilt with one finger */}
+        {adjusting && (
+          <div
+            className="absolute inset-0 z-20 cursor-grabbing touch-none"
+            onPointerMove={(e) => moveAdjust(e.clientX, e.clientY)}
+            onPointerUp={endAdjust}
+            onPointerCancel={endAdjust}
+            onPointerLeave={endAdjust}
+          >
+            <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-background/90 px-3 py-1 text-xs font-medium shadow ring-1 ring-border">
+              Arraste: ↔ rotacionar · ↕ inclinar
+            </div>
+          </div>
+        )}
+
+        {/* Right-side controls stack */}
+        <div
+          className="absolute right-3 top-3 z-10 flex flex-col gap-2"
+          style={{ top: "calc(0.75rem)" }}
+        >
+          {/* Compass */}
+          <button
+            onClick={resetNorth}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95"
+            aria-label="Apontar para o Norte"
+            title="Norte"
+          >
+            <div
+              className="relative h-6 w-6"
+              style={{ transform: `rotate(${-heading}deg)`, transition: adjusting ? "none" : "transform 120ms" }}
+            >
+              <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
+            </div>
+          </button>
+
+          {/* Layers menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLayers((v) => !v)}
+              className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 ${showLayers ? "bg-accent" : ""}`}
+              aria-label="Camadas"
+            >
+              <Layers className="h-5 w-5 text-foreground" />
+            </button>
+            {showLayers && (
+              <div className="absolute right-0 top-12 w-48 rounded-2xl border border-border bg-background/98 p-1.5 shadow-xl backdrop-blur">
+                {([
+                  { v: "roadmap", label: "🗺️ Padrão" },
+                  { v: "satellite", label: "🛰️ Satélite" },
+                  { v: "hybrid", label: "🌍 Híbrido" },
+                  { v: "terrain", label: "🏔️ Terreno" },
+                ] as { v: MapType; label: string }[]).map((o) => (
+                  <button
+                    key={o.v}
+                    onClick={() => { setMapType(o.v); setShowLayers(false); }}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-accent ${mapType === o.v ? "bg-accent font-medium" : ""}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+                <div className="my-1 h-px bg-border" />
+                <button
+                  onClick={() => setTrafficOn((v) => !v)}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-accent ${trafficOn ? "bg-accent font-medium" : ""}`}
+                >
+                  🚗 Trânsito {trafficOn ? "(ligado)" : ""}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Zoom controls — circular, fully visible */}
+          <div className="flex flex-col overflow-hidden rounded-full bg-background/95 shadow-lg ring-1 ring-border">
+            <button
+              onClick={() => zoomBy(1)}
+              className="flex h-11 w-11 items-center justify-center transition hover:bg-accent active:scale-95"
+              aria-label="Aumentar zoom"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+            <div className="mx-2 h-px bg-border" />
+            <button
+              onClick={() => zoomBy(-1)}
+              className="flex h-11 w-11 items-center justify-center transition hover:bg-accent active:scale-95"
+              aria-label="Diminuir zoom"
+            >
+              <Minus className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Tilt/rotate adjuster — long-press / press-and-drag */}
+          <button
+            onPointerDown={(e) => { e.preventDefault(); startAdjust(e.clientX, e.clientY); }}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none"
+            aria-label="Ajustar inclinação e rotação"
+            title="Pressione e arraste para girar/inclinar"
+          >
+            <Navigation
+              className="h-5 w-5 text-foreground"
+              style={{ transform: `rotate(${tilt > 0 ? 30 : 0}deg)` }}
+            />
+          </button>
+        </div>
+
+        {/* Locate me — bottom right */}
         <button
           onClick={locateMe}
-          className="absolute right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] flex h-11 w-11 items-center justify-center rounded-full bg-background shadow-lg ring-1 ring-border hover:bg-accent"
+          className="absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-border transition hover:opacity-90 active:scale-95"
           aria-label="Minha localização"
         >
-          <LocateFixed className="h-5 w-5 text-primary" />
+          <LocateFixed className="h-5 w-5" />
         </button>
 
         {/* Selected event card */}
         {selected && (
-          <div className="absolute left-4 right-4 bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
+          <div className="absolute left-3 right-3 bottom-[calc(80px+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
             <div className="flex items-start gap-3">
-              <span
-                className="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-full"
-                style={{ background: selected.color }}
-              />
+              <span className="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-full" style={{ background: selected.color }} />
               <div className="min-w-0 flex-1">
-                <div className="font-display text-base font-semibold">
-                  {selected.title}
-                </div>
+                <div className="font-display text-base font-semibold truncate">{selected.title}</div>
                 <div className="text-xs text-muted-foreground">
-                  {format(parseISO(selected.date), "EEE, d 'de' MMM", {
-                    locale: ptBR,
-                  })}{" "}
-                  · {minutesToLabel(selected.start)}–
-                  {minutesToLabel(selected.end)}
+                  {format(parseISO(selected.date), "EEE, d 'de' MMM", { locale: ptBR })} · {minutesToLabel(selected.start)}–{minutesToLabel(selected.end)}
                 </div>
                 {selected.location?.address && (
                   <div className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
@@ -451,15 +544,11 @@ function MapPage() {
               </button>
             </div>
             <div className="mt-3 flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={() => openRoute(selected)}
-              >
+              <Button size="sm" className="flex-1" onClick={() => openRoute(selected)}>
                 <Navigation className="mr-1.5 h-4 w-4" />
                 Rotas
               </Button>
-              <Link to="/" className="flex-1">
+              <Link to="/calendar" className="flex-1">
                 <Button size="sm" variant="outline" className="w-full">
                   Ver detalhes
                 </Button>
