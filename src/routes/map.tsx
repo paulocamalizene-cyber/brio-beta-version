@@ -127,6 +127,8 @@ function MapPage() {
         const map = new google.maps.Map(containerRef.current, {
           center: { lat: -23.5505, lng: -46.6333 },
           zoom: 12,
+          minZoom: 3,
+          maxZoom: 21,
           mapTypeId: mapType,
           mapTypeControl: false,
           streetViewControl: false,
@@ -140,6 +142,12 @@ function MapPage() {
           heading: 0,
           clickableIcons: false,
           keyboardShortcuts: false,
+          backgroundColor: "#e8eaed",
+          disableDefaultUI: true,
+          restriction: {
+            latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
+            strictBounds: true,
+          },
         });
         mapRef.current = map;
         map.addListener("heading_changed", () => {
