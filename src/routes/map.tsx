@@ -388,36 +388,46 @@ function MapPage() {
     const google = (window as any).google;
     const map = mapRef.current;
 
-    // Build persistent overlays once
-    if (!userAccuracyRef.current) {
-      userAccuracyRef.current = new google.maps.Circle({
-        map,
-        radius: 0,
-        strokeColor: "#4285F4",
-        strokeOpacity: 0.35,
-        strokeWeight: 1,
-        fillColor: "#4285F4",
-        fillOpacity: 0.15,
-        clickable: false,
-        zIndex: 998,
-      });
-    }
+    // Build persistent user-location overlay once. Uses OverlayView so we can
+    // render an HTML element with a CSS-animated pulsing aura — smooth and
+    // GPU-accelerated, independent of map camera changes (zoom/rotate/pan).
     if (!userDotRef.current) {
-      userDotRef.current = new google.maps.Marker({
-        map,
-        clickable: false,
-        zIndex: 1000,
-        optimized: false,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: "#4285F4",
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 3,
-        },
-      });
+      const el = document.createElement("div");
+      el.className = "user-loc";
+      el.innerHTML = '<div class="user-loc__pulse"></div><div class="user-loc__dot"></div>';
+      // Smooth movement between GPS fixes
+      el.style.transition = "left 400ms linear, top 400ms linear";
+
+      class UserOverlay extends google.maps.OverlayView {
+        position: any = null;
+        div: HTMLDivElement = el;
+        onAdd() {
+          const panes = this.getPanes();
+          // floatPane sits above markers so the dot never gets occluded
+          panes.floatPane.appendChild(this.div);
+        }
+        draw() {
+          if (!this.position) return;
+          const proj = this.getProjection();
+          if (!proj) return;
+          const pt = proj.fromLatLngToDivPixel(this.position);
+          if (!pt) return;
+          this.div.style.left = pt.x + "px";
+          this.div.style.top = pt.y + "px";
+        }
+        onRemove() {
+          if (this.div.parentNode) this.div.parentNode.removeChild(this.div);
+        }
+        setPosition(latLng: any) {
+          this.position = latLng;
+          this.draw();
+        }
+      }
+      const overlay = new UserOverlay();
+      overlay.setMap(map);
+      userDotRef.current = overlay;
     }
+
     // Optional heading indicator (triangle) — hidden until we have a heading
     if (!userHeadingRef.current) {
       userHeadingRef.current = new google.maps.Marker({
@@ -426,7 +436,7 @@ function MapPage() {
         zIndex: 999,
         optimized: false,
         icon: {
-          path: "M 0,-18 L 7,-4 L 0,-8 L -7,-4 Z",
+          path: "M 0,-22 L 8,-6 L 0,-10 L -8,-6 Z",
           fillColor: "#4285F4",
           fillOpacity: 0.9,
           strokeColor: "#ffffff",
@@ -440,9 +450,8 @@ function MapPage() {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       lastUserPosRef.current = p;
       setLocPermission("granted");
-      userDotRef.current.setPosition(p);
-      userAccuracyRef.current.setCenter(p);
-      userAccuracyRef.current.setRadius(Math.max(pos.coords.accuracy || 0, 5));
+      const latLng = new google.maps.LatLng(p.lat, p.lng);
+      userDotRef.current.setPosition(latLng);
       if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
         const icon = userHeadingRef.current.getIcon();
         userHeadingRef.current.setPosition(p);
@@ -450,6 +459,7 @@ function MapPage() {
         if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
       }
     };
+
     const onErr = (err: GeolocationPositionError) => {
       if (err.code === err.PERMISSION_DENIED) setLocPermission("denied");
     };
