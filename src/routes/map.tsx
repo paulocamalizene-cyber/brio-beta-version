@@ -498,6 +498,15 @@ function MapPage() {
           </div>
         )}
 
+        {/* Angle overlay while rotating */}
+        {(compassDragging || adjusting) && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/90 px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
+            {Math.round(heading)}°
+          </div>
+        )}
+
+
+
         {/* Right-side controls stack */}
         <div
           className="absolute right-3 top-3 z-10 flex flex-col gap-2"
