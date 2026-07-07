@@ -96,6 +96,15 @@ function MapPage() {
   const [error, setError] = useState<string | null>(null);
   const didInitialFitRef = useRef(false);
 
+  // User location refs
+  const userDotRef = useRef<any>(null);
+  const userAccuracyRef = useRef<any>(null);
+  const userHeadingRef = useRef<any>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [locPermission, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
+
+
 
   // Load events
   useEffect(() => {
