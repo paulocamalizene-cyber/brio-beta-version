@@ -96,6 +96,15 @@ function MapPage() {
   const [error, setError] = useState<string | null>(null);
   const didInitialFitRef = useRef(false);
 
+  // User location refs
+  const userDotRef = useRef<any>(null);
+  const userAccuracyRef = useRef<any>(null);
+  const userHeadingRef = useRef<any>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
+
+
 
   // Load events
   useEffect(() => {
@@ -370,18 +379,145 @@ function MapPage() {
     }
   }, [filteredEvents, ready, selectedId]);
 
+  // Watch user location continuously and render a Google-Maps-style blue dot
+  // with an accuracy circle. Runs independently from event markers so it is
+  // never cleared by fitBounds / marker sync / map camera changes.
+  useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    const google = (window as any).google;
+    const map = mapRef.current;
+
+    // Build persistent overlays once
+    if (!userAccuracyRef.current) {
+      userAccuracyRef.current = new google.maps.Circle({
+        map,
+        radius: 0,
+        strokeColor: "#4285F4",
+        strokeOpacity: 0.35,
+        strokeWeight: 1,
+        fillColor: "#4285F4",
+        fillOpacity: 0.15,
+        clickable: false,
+        zIndex: 998,
+      });
+    }
+    if (!userDotRef.current) {
+      userDotRef.current = new google.maps.Marker({
+        map,
+        clickable: false,
+        zIndex: 1000,
+        optimized: false,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#4285F4",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
+    }
+    // Optional heading indicator (triangle) — hidden until we have a heading
+    if (!userHeadingRef.current) {
+      userHeadingRef.current = new google.maps.Marker({
+        map: null,
+        clickable: false,
+        zIndex: 999,
+        optimized: false,
+        icon: {
+          path: "M 0,-18 L 7,-4 L 0,-8 L -7,-4 Z",
+          fillColor: "#4285F4",
+          fillOpacity: 0.9,
+          strokeColor: "#ffffff",
+          strokeWeight: 1,
+          rotation: 0,
+        },
+      });
+    }
+
+    const onPos = (pos: GeolocationPosition) => {
+      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      lastUserPosRef.current = p;
+      setLocPermission("granted");
+      userDotRef.current.setPosition(p);
+      userAccuracyRef.current.setCenter(p);
+      userAccuracyRef.current.setRadius(Math.max(pos.coords.accuracy || 0, 5));
+      if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
+        const icon = userHeadingRef.current.getIcon();
+        userHeadingRef.current.setPosition(p);
+        userHeadingRef.current.setIcon({ ...icon, rotation: pos.coords.heading });
+        if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
+      }
+    };
+    const onErr = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED) setLocPermission("denied");
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true,
+      maximumAge: 2000,
+      timeout: 15000,
+    });
+
+    // Device orientation as heading fallback (mobile compass)
+    const onOrient = (e: DeviceOrientationEvent) => {
+      const anyE = e as any;
+      const alpha = anyE.webkitCompassHeading != null ? anyE.webkitCompassHeading : (e.alpha != null ? 360 - e.alpha : null);
+      if (alpha == null || Number.isNaN(alpha) || !lastUserPosRef.current) return;
+      const icon = userHeadingRef.current.getIcon();
+      userHeadingRef.current.setPosition(lastUserPosRef.current);
+      userHeadingRef.current.setIcon({ ...icon, rotation: alpha });
+      if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
+    };
+    window.addEventListener("deviceorientationabsolute" as any, onOrient as any, true);
+    window.addEventListener("deviceorientation", onOrient, true);
+
+    return () => {
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      window.removeEventListener("deviceorientationabsolute" as any, onOrient as any, true);
+      window.removeEventListener("deviceorientation", onOrient, true);
+    };
+  }, [ready]);
+
   function locateMe() {
-    if (!ready || !navigator.geolocation) return;
+    if (!ready || !mapRef.current) return;
+    // If we already have a fix, just recenter — no auto-follow after that.
+    if (lastUserPosRef.current) {
+      mapRef.current.panTo(lastUserPosRef.current);
+      const z = mapRef.current.getZoom() || 12;
+      if (z < 15) mapRef.current.setZoom(16);
+      return;
+    }
+    if (!navigator.geolocation) {
+      setError("Geolocalização não suportada neste dispositivo.");
+      return;
+    }
+    // iOS 13+: request permission for device orientation on user gesture
+    const anyDOE = (window as any).DeviceOrientationEvent;
+    if (anyDOE && typeof anyDOE.requestPermission === "function") {
+      anyDOE.requestPermission().catch(() => {});
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        mapRef.current.setCenter(p);
-        mapRef.current.setZoom(15);
+        lastUserPosRef.current = p;
+        setLocPermission("granted");
+        mapRef.current.panTo(p);
+        mapRef.current.setZoom(16);
       },
-      () => {},
-      { enableHighAccuracy: true, timeout: 8000 },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocPermission("denied");
+          setError("Permissão de localização negada. Ative-a nas configurações do navegador.");
+          setTimeout(() => setError(null), 4000);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }
+
 
   function zoomBy(delta: number) {
     if (!mapRef.current) return;
