@@ -201,6 +201,76 @@ function MapPage() {
     adjustStartRef.current = null;
   }
 
+  // Compass drag-to-rotate: press compass and drag around it to rotate the map.
+  // If the pointer barely moved, treat as a click → reset to north when not aligned.
+  const compassRef = useRef<HTMLButtonElement | null>(null);
+  const compassDragRef = useRef<{
+    cx: number; cy: number; startAngle: number; startHeading: number; moved: boolean;
+  } | null>(null);
+  const [compassDragging, setCompassDragging] = useState(false);
+
+  function angleFromCenter(cx: number, cy: number, x: number, y: number) {
+    // 0° = up (north), clockwise positive
+    return (Math.atan2(x - cx, cy - y) * 180) / Math.PI;
+  }
+
+  function onCompassPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!mapRef.current || !compassRef.current) return;
+    e.preventDefault();
+    compassRef.current.setPointerCapture(e.pointerId);
+    const rect = compassRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    compassDragRef.current = {
+      cx, cy,
+      startAngle: angleFromCenter(cx, cy, e.clientX, e.clientY),
+      startHeading: mapRef.current.getHeading() || 0,
+      moved: false,
+    };
+    setCompassDragging(true);
+  }
+  function onCompassPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const d = compassDragRef.current;
+    if (!d || !mapRef.current) return;
+    const a = angleFromCenter(d.cx, d.cy, e.clientX, e.clientY);
+    const delta = a - d.startAngle;
+    if (Math.abs(delta) > 2) d.moved = true;
+    let h = (d.startHeading + delta) % 360;
+    if (h < 0) h += 360;
+    mapRef.current.setHeading(h);
+  }
+  function onCompassPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+    const d = compassDragRef.current;
+    if (compassRef.current?.hasPointerCapture(e.pointerId)) {
+      compassRef.current.releasePointerCapture(e.pointerId);
+    }
+    const wasDrag = !!d?.moved;
+    compassDragRef.current = null;
+    setCompassDragging(false);
+    if (!wasDrag && mapRef.current) {
+      const h = mapRef.current.getHeading() || 0;
+      if (Math.abs(h) > 0.5 && Math.abs(h - 360) > 0.5) {
+        resetNorth();
+      }
+    }
+  }
+
+  // Keyboard: Alt+ArrowLeft/Right rotate by 15°
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!mapRef.current || !e.altKey) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const step = e.key === "ArrowLeft" ? -15 : 15;
+      let h = ((mapRef.current.getHeading() || 0) + step) % 360;
+      if (h < 0) h += 360;
+      mapRef.current.setHeading(h);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+
   useEffect(() => {
     if (mapRef.current) mapRef.current.setMapTypeId(mapType);
   }, [mapType]);
@@ -428,26 +498,41 @@ function MapPage() {
           </div>
         )}
 
+        {/* Angle overlay while rotating */}
+        {(compassDragging || adjusting) && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/90 px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
+            {Math.round(heading)}°
+          </div>
+        )}
+
+
+
         {/* Right-side controls stack */}
         <div
           className="absolute right-3 top-3 z-10 flex flex-col gap-2"
           style={{ top: "calc(0.75rem)" }}
         >
-          {/* Compass */}
+          {/* Compass — click to reset north, drag around it to rotate */}
           <button
-            onClick={resetNorth}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95"
-            aria-label="Apontar para o Norte"
-            title="Norte"
+            ref={compassRef}
+            onPointerDown={onCompassPointerDown}
+            onPointerMove={onCompassPointerMove}
+            onPointerUp={onCompassPointerUp}
+            onPointerCancel={onCompassPointerUp}
+            className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            style={{ cursor: compassDragging ? "grabbing" : "grab" }}
+            aria-label="Bússola — clique para norte, arraste para rotacionar"
+            title={heading > 0.5 ? "Clique: norte · Arraste: rotacionar" : "Arraste para rotacionar"}
           >
             <div
               className="relative h-6 w-6"
-              style={{ transform: `rotate(${-heading}deg)`, transition: adjusting ? "none" : "transform 120ms" }}
+              style={{ transform: `rotate(${-heading}deg)`, transition: adjusting || compassDragging ? "none" : "transform 120ms" }}
             >
               <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
               <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
             </div>
           </button>
+
 
           {/* Layers menu */}
           <div className="relative">
