@@ -201,6 +201,76 @@ function MapPage() {
     adjustStartRef.current = null;
   }
 
+  // Compass drag-to-rotate: press compass and drag around it to rotate the map.
+  // If the pointer barely moved, treat as a click → reset to north when not aligned.
+  const compassRef = useRef<HTMLButtonElement | null>(null);
+  const compassDragRef = useRef<{
+    cx: number; cy: number; startAngle: number; startHeading: number; moved: boolean;
+  } | null>(null);
+  const [compassDragging, setCompassDragging] = useState(false);
+
+  function angleFromCenter(cx: number, cy: number, x: number, y: number) {
+    // 0° = up (north), clockwise positive
+    return (Math.atan2(x - cx, cy - y) * 180) / Math.PI;
+  }
+
+  function onCompassPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!mapRef.current || !compassRef.current) return;
+    e.preventDefault();
+    compassRef.current.setPointerCapture(e.pointerId);
+    const rect = compassRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    compassDragRef.current = {
+      cx, cy,
+      startAngle: angleFromCenter(cx, cy, e.clientX, e.clientY),
+      startHeading: mapRef.current.getHeading() || 0,
+      moved: false,
+    };
+    setCompassDragging(true);
+  }
+  function onCompassPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const d = compassDragRef.current;
+    if (!d || !mapRef.current) return;
+    const a = angleFromCenter(d.cx, d.cy, e.clientX, e.clientY);
+    const delta = a - d.startAngle;
+    if (Math.abs(delta) > 2) d.moved = true;
+    let h = (d.startHeading + delta) % 360;
+    if (h < 0) h += 360;
+    mapRef.current.setHeading(h);
+  }
+  function onCompassPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+    const d = compassDragRef.current;
+    if (compassRef.current?.hasPointerCapture(e.pointerId)) {
+      compassRef.current.releasePointerCapture(e.pointerId);
+    }
+    const wasDrag = !!d?.moved;
+    compassDragRef.current = null;
+    setCompassDragging(false);
+    if (!wasDrag && mapRef.current) {
+      const h = mapRef.current.getHeading() || 0;
+      if (Math.abs(h) > 0.5 && Math.abs(h - 360) > 0.5) {
+        resetNorth();
+      }
+    }
+  }
+
+  // Keyboard: Alt+ArrowLeft/Right rotate by 15°
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!mapRef.current || !e.altKey) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const step = e.key === "ArrowLeft" ? -15 : 15;
+      let h = ((mapRef.current.getHeading() || 0) + step) % 360;
+      if (h < 0) h += 360;
+      mapRef.current.setHeading(h);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+
   useEffect(() => {
     if (mapRef.current) mapRef.current.setMapTypeId(mapType);
   }, [mapType]);
