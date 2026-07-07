@@ -357,7 +357,10 @@ function MapPage() {
         markersRef.current.delete(id);
       }
     }
-    if (any && !selectedId) {
+    // Only fit bounds ONCE (initial load). fitBounds resets heading/tilt,
+    // which would fight the user's rotation on every event change.
+    if (any && !selectedId && !didInitialFitRef.current) {
+      didInitialFitRef.current = true;
       try {
         map.fitBounds(bounds, 80);
         if (filteredEvents.length === 1) map.setZoom(14);
