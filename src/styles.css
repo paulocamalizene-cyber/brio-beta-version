@@ -112,3 +112,39 @@ div[style*="Edit with Lovable"],
   z-index: -9999 !important;
 }
 
+/* User location indicator (Google/Apple Maps style) */
+.user-loc {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  will-change: transform;
+}
+.user-loc__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #4285F4;
+  opacity: 0.35;
+  animation: user-loc-pulse 1800ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+.user-loc__dot {
+  position: absolute;
+  inset: 5px;
+  border-radius: 9999px;
+  background: #4285F4;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+@keyframes user-loc-pulse {
+  0%   { transform: scale(0.6); opacity: 0.55; }
+  70%  { transform: scale(2.4); opacity: 0;    }
+  100% { transform: scale(2.4); opacity: 0;    }
+}
+@media (prefers-reduced-motion: reduce) {
+  .user-loc__pulse { animation-duration: 3000ms; }
+}
+
+
