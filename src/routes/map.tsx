@@ -103,6 +103,9 @@ function MapPage() {
   const watchIdRef = useRef<number | null>(null);
   const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
+  const [tracking, setTracking] = useState(false);
+  const trackingRef = useRef(false);
+
 
 
 
