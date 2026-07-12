@@ -513,7 +513,11 @@ function MapPage() {
 
   function locateMe() {
     if (!ready || !mapRef.current) return;
-    // If we already have a fix, just recenter — no auto-follow after that.
+    // Enable tracking mode — the button is now "active" and subsequent GPS
+    // fixes will pan the camera. Any user drag disables it again.
+    trackingRef.current = true;
+    setTracking(true);
+    // If we already have a fix, just recenter.
     if (lastUserPosRef.current) {
       mapRef.current.panTo(lastUserPosRef.current);
       const z = mapRef.current.getZoom() || 12;
@@ -540,6 +544,8 @@ function MapPage() {
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
           setLocPermission("denied");
+          trackingRef.current = false;
+          setTracking(false);
           setError("Permissão de localização negada. Ative-a nas configurações do navegador.");
           setTimeout(() => setError(null), 4000);
         }
@@ -547,6 +553,7 @@ function MapPage() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }
+
 
 
   function zoomBy(delta: number) {
