@@ -103,6 +103,9 @@ function MapPage() {
   const watchIdRef = useRef<number | null>(null);
   const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
+  const [tracking, setTracking] = useState(false);
+  const trackingRef = useRef(false);
+
 
 
 
@@ -167,7 +170,16 @@ function MapPage() {
         map.addListener("tilt_changed", () => {
           setTilt(map.getTilt() || 0);
         });
+        // User gestures (drag/pinch) disable tracking — the map should never
+        // snap back to the user's location while they're exploring.
+        map.addListener("dragstart", () => {
+          if (trackingRef.current) {
+            trackingRef.current = false;
+            setTracking(false);
+          }
+        });
         setReady(true);
+
       })
       .catch((err) => {
         console.error(err);
@@ -395,8 +407,11 @@ function MapPage() {
       const el = document.createElement("div");
       el.className = "user-loc";
       el.innerHTML = '<div class="user-loc__pulse"></div><div class="user-loc__dot"></div>';
-      // Smooth movement between GPS fixes
-      el.style.transition = "left 400ms linear, top 400ms linear";
+      // IMPORTANT: no CSS transition on left/top — OverlayView.draw() runs on
+      // every pan/zoom frame. A transition here makes the dot lag behind the
+      // map (looking like it is "stuck to the screen"). Position updates are
+      // instant so the dot stays anchored to its geographic coordinates.
+
 
       class UserOverlay extends google.maps.OverlayView {
         position: any = null;
@@ -452,6 +467,10 @@ function MapPage() {
       setLocPermission("granted");
       const latLng = new google.maps.LatLng(p.lat, p.lng);
       userDotRef.current.setPosition(latLng);
+      // Camera only follows when the user explicitly enabled tracking.
+      if (trackingRef.current) {
+        map.panTo(p);
+      }
       if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
         const icon = userHeadingRef.current.getIcon();
         userHeadingRef.current.setPosition(p);
@@ -459,6 +478,7 @@ function MapPage() {
         if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
       }
     };
+
 
     const onErr = (err: GeolocationPositionError) => {
       if (err.code === err.PERMISSION_DENIED) setLocPermission("denied");
@@ -493,7 +513,11 @@ function MapPage() {
 
   function locateMe() {
     if (!ready || !mapRef.current) return;
-    // If we already have a fix, just recenter — no auto-follow after that.
+    // Enable tracking mode — the button is now "active" and subsequent GPS
+    // fixes will pan the camera. Any user drag disables it again.
+    trackingRef.current = true;
+    setTracking(true);
+    // If we already have a fix, just recenter.
     if (lastUserPosRef.current) {
       mapRef.current.panTo(lastUserPosRef.current);
       const z = mapRef.current.getZoom() || 12;
@@ -520,6 +544,8 @@ function MapPage() {
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
           setLocPermission("denied");
+          trackingRef.current = false;
+          setTracking(false);
           setError("Permissão de localização negada. Ative-a nas configurações do navegador.");
           setTimeout(() => setError(null), 4000);
         }
@@ -527,6 +553,7 @@ function MapPage() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }
+
 
 
   function zoomBy(delta: number) {
@@ -756,14 +783,16 @@ function MapPage() {
           </button>
         </div>
 
-        {/* Locate me — bottom right */}
+        {/* Locate me — bottom right. Filled when tracking is active. */}
         <button
           onClick={locateMe}
-          className="absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-border transition hover:opacity-90 active:scale-95"
+          className={`absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
           aria-label="Minha localização"
+          aria-pressed={tracking}
         >
           <LocateFixed className="h-5 w-5" />
         </button>
+
 
         {/* Selected event card */}
         {selected && (
