@@ -109,7 +109,10 @@ function MapPage() {
 
 
 
-  // Load events
+  // Load events. Use storage events + visibility change instead of a 2s
+  // interval — the interval caused a re-render every 2s which invalidated
+  // memoised event lists and forced a full marker re-sync, stealing frames
+  // from the map's gesture handling on mobile.
   useEffect(() => {
     const read = () => {
       try {
@@ -123,11 +126,12 @@ function MapPage() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) read();
     };
+    const onVis = () => { if (document.visibilityState === "visible") read(); };
     window.addEventListener("storage", onStorage);
-    const t = setInterval(read, 2000);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("storage", onStorage);
-      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 
