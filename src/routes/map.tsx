@@ -395,8 +395,11 @@ function MapPage() {
       const el = document.createElement("div");
       el.className = "user-loc";
       el.innerHTML = '<div class="user-loc__pulse"></div><div class="user-loc__dot"></div>';
-      // Smooth movement between GPS fixes
-      el.style.transition = "left 400ms linear, top 400ms linear";
+      // IMPORTANT: no CSS transition on left/top — OverlayView.draw() runs on
+      // every pan/zoom frame. A transition here makes the dot lag behind the
+      // map (looking like it is "stuck to the screen"). Position updates are
+      // instant so the dot stays anchored to its geographic coordinates.
+
 
       class UserOverlay extends google.maps.OverlayView {
         position: any = null;
