@@ -192,11 +192,22 @@ function MapPage() {
         if (typeof map.setTiltInteractionEnabled === "function") {
           map.setTiltInteractionEnabled(true);
         }
+        // Throttle heading updates to the browser's paint clock. Google's
+        // native gesture engine fires heading_changed on every animation
+        // frame during a two-finger rotate; calling setState synchronously
+        // there triggers a React render per frame, which starves the
+        // gesture thread on mid-range mobiles. We coalesce to one React
+        // update per rAF and keep the marker rotation in a plain ref.
+        let headingRaf = 0;
         map.addListener("heading_changed", () => {
           const nextHeading = map.getHeading() || 0;
           mapHeadingRef.current = nextHeading;
-          setHeading(nextHeading);
           updateUserHeadingMarkerRotation();
+          if (headingRaf) return;
+          headingRaf = requestAnimationFrame(() => {
+            headingRaf = 0;
+            setHeading(mapHeadingRef.current);
+          });
         });
         setReady(true);
 
