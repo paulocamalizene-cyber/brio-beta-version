@@ -87,7 +87,6 @@ function MapPage() {
   const [showLayers, setShowLayers] = useState(false);
   const [trafficOn, setTrafficOn] = useState(false);
   const [heading, setHeading] = useState(0);
-  const [tilt, setTilt] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -194,9 +193,6 @@ function MapPage() {
           mapHeadingRef.current = nextHeading;
           setHeading(nextHeading);
           updateUserHeadingMarkerRotation();
-        });
-        map.addListener("tilt_changed", () => {
-          setTilt(map.getTilt() || 0);
         });
         setReady(true);
 
@@ -701,26 +697,27 @@ function MapPage() {
           className="absolute right-3 top-3 z-10 flex flex-col gap-2"
           style={{ top: "calc(0.75rem)" }}
         >
-          {/* Bússola — sempre visível. Clique: norte; arraste: rotacionar. */}
-          <button
-            ref={compassRef}
-            onPointerDown={onCompassPointerDown}
-            onPointerMove={onCompassPointerMove}
-            onPointerUp={onCompassPointerUp}
-            onPointerCancel={onCompassPointerUp}
-            className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
-            style={{ cursor: compassDragging ? "grabbing" : "grab" }}
-            aria-label="Bússola: voltar ao norte"
-            title="Clique: voltar ao norte · Arraste: rotacionar"
-          >
-            <div
-              className="relative h-6 w-6"
-              style={{ transform: `rotate(${-heading}deg)`, transition: adjusting || compassDragging ? "none" : "transform 120ms" }}
+          {(Math.abs(heading) > 0.5 || Math.abs(heading - 360) < 0.5 || compassDragging) && (
+            <button
+              ref={compassRef}
+              onPointerDown={onCompassPointerDown}
+              onPointerMove={onCompassPointerMove}
+              onPointerUp={onCompassPointerUp}
+              onPointerCancel={onCompassPointerUp}
+              className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
+              style={{ cursor: compassDragging ? "grabbing" : "grab" }}
+              aria-label="Bússola: voltar ao norte"
+              title="Clique: voltar ao norte · Arraste: rotacionar"
             >
-              <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
-              <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
-            </div>
-          </button>
+              <div
+                className="relative h-6 w-6"
+                style={{ transform: `rotate(${-heading}deg)`, transition: compassDragging ? "none" : "transform 120ms" }}
+              >
+                <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
+              </div>
+            </button>
+          )}
 
 
           {/* Layers menu */}
