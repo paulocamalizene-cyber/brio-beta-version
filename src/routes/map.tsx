@@ -102,6 +102,8 @@ function MapPage() {
   const userHeadingRef = useRef<any>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const userBearingRef = useRef<number | null>(null);
+  const mapHeadingRef = useRef(0);
   const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
   const [tracking, setTracking] = useState(false);
   const trackingRef = useRef(false);
@@ -169,6 +171,11 @@ function MapPage() {
         });
 
         mapRef.current = map;
+        map.setOptions({
+          headingInteractionEnabled: true,
+          tiltInteractionEnabled: true,
+          rotateControl: true,
+        });
         if (typeof map.setHeadingInteractionEnabled === "function") {
           map.setHeadingInteractionEnabled(true);
         }
@@ -176,7 +183,10 @@ function MapPage() {
           map.setTiltInteractionEnabled(true);
         }
         map.addListener("heading_changed", () => {
-          setHeading(map.getHeading() || 0);
+          const nextHeading = map.getHeading() || 0;
+          mapHeadingRef.current = nextHeading;
+          setHeading(nextHeading);
+          updateUserHeadingMarkerRotation();
         });
         map.addListener("tilt_changed", () => {
           setTilt(map.getTilt() || 0);
@@ -202,8 +212,65 @@ function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Vector maps handle two-finger rotate/tilt natively. We only add a desktop
-  // affordance: Shift/Ctrl/⌘ + mouse drag → rotate (horizontal) and tilt (vertical).
+  function updateUserHeadingMarkerRotation(bearing = userBearingRef.current) {
+    if (!userHeadingRef.current || bearing == null || Number.isNaN(bearing)) return;
+    const icon = userHeadingRef.current.getIcon() || {};
+    const rotation = (bearing - mapHeadingRef.current + 360) % 360;
+    userHeadingRef.current.setIcon({ ...icon, rotation });
+  }
+
+  // Vector maps handle two-finger rotate/tilt natively when the API/browser
+  // supports it. This capture-phase fallback mirrors Google Maps behavior on
+  // devices where the native heading gesture is unavailable or disabled by the
+  // loaded map style: two fingers rotate freely without forcing north again.
+  useEffect(() => {
+    if (!ready || !containerRef.current || !mapRef.current) return;
+    const el = containerRef.current;
+    const map = mapRef.current;
+
+    let rotateGesture: { angle: number; heading: number } | null = null;
+    const touchAngle = (touches: TouchList) => {
+      const a = touches[0];
+      const b = touches[1];
+      return (Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180) / Math.PI;
+    };
+    const normalizeHeading = (value: number) => {
+      const next = value % 360;
+      return next < 0 ? next + 360 : next;
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      rotateGesture = {
+        angle: touchAngle(e.touches),
+        heading: map.getHeading() || 0,
+      };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !rotateGesture) return;
+      const nextHeading = normalizeHeading(
+        rotateGesture.heading + touchAngle(e.touches) - rotateGesture.angle,
+      );
+      map.setHeading(nextHeading);
+      mapHeadingRef.current = nextHeading;
+      updateUserHeadingMarkerRotation();
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) rotateGesture = null;
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
+    el.addEventListener("touchmove", onTouchMove, { capture: true, passive: true });
+    el.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart, { capture: true } as any);
+      el.removeEventListener("touchmove", onTouchMove, { capture: true } as any);
+      el.removeEventListener("touchend", onTouchEnd, { capture: true } as any);
+      el.removeEventListener("touchcancel", onTouchEnd, { capture: true } as any);
+    };
+  }, [ready]);
+
+  // Desktop affordance: Shift/Ctrl/⌘ + mouse drag → rotate (horizontal) and tilt (vertical).
   useEffect(() => {
     if (!ready || !containerRef.current || !mapRef.current) return;
     const el = containerRef.current;
@@ -225,6 +292,8 @@ function MapPage() {
       let h = (start.h + dx * 0.6) % 360;
       if (h < 0) h += 360;
       map.setHeading(h);
+      mapHeadingRef.current = h;
+      updateUserHeadingMarkerRotation();
       map.setTilt(Math.max(0, Math.min(67.5, start.t - dy * 0.3)));
     };
     const onMouseUp = () => {
@@ -269,6 +338,8 @@ function MapPage() {
     const newHeading = (adjustStartRef.current.h + dx * 0.6) % 360;
     const newTilt = Math.max(0, Math.min(67.5, adjustStartRef.current.t - dy * 0.3));
     mapRef.current.setHeading(newHeading < 0 ? newHeading + 360 : newHeading);
+    mapHeadingRef.current = newHeading < 0 ? newHeading + 360 : newHeading;
+    updateUserHeadingMarkerRotation();
     mapRef.current.setTilt(newTilt);
   }
   function endAdjust() {
@@ -314,6 +385,8 @@ function MapPage() {
     let h = (d.startHeading + delta) % 360;
     if (h < 0) h += 360;
     mapRef.current.setHeading(h);
+    mapHeadingRef.current = h;
+    updateUserHeadingMarkerRotation();
   }
   function onCompassPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
     const d = compassDragRef.current;
@@ -341,6 +414,8 @@ function MapPage() {
       let h = ((mapRef.current.getHeading() || 0) + step) % 360;
       if (h < 0) h += 360;
       mapRef.current.setHeading(h);
+      mapHeadingRef.current = h;
+      updateUserHeadingMarkerRotation();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -525,9 +600,9 @@ function MapPage() {
         map.panTo(p);
       }
       if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
-        const icon = userHeadingRef.current.getIcon();
+        userBearingRef.current = pos.coords.heading;
         userHeadingRef.current.setPosition(p);
-        userHeadingRef.current.setIcon({ ...icon, rotation: pos.coords.heading });
+        updateUserHeadingMarkerRotation(pos.coords.heading);
         if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
       }
     };
@@ -548,9 +623,9 @@ function MapPage() {
       const anyE = e as any;
       const alpha = anyE.webkitCompassHeading != null ? anyE.webkitCompassHeading : (e.alpha != null ? 360 - e.alpha : null);
       if (alpha == null || Number.isNaN(alpha) || !lastUserPosRef.current) return;
-      const icon = userHeadingRef.current.getIcon();
+      userBearingRef.current = alpha;
       userHeadingRef.current.setPosition(lastUserPosRef.current);
-      userHeadingRef.current.setIcon({ ...icon, rotation: alpha });
+      updateUserHeadingMarkerRotation(alpha);
       if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
     };
     window.addEventListener("deviceorientationabsolute" as any, onOrient as any, true);
@@ -618,7 +693,8 @@ function MapPage() {
   function resetNorth() {
     if (!mapRef.current) return;
     mapRef.current.setHeading(0);
-    mapRef.current.setTilt(0);
+    mapHeadingRef.current = 0;
+    updateUserHeadingMarkerRotation();
   }
 
   async function runSearch(e: React.FormEvent) {
@@ -747,28 +823,26 @@ function MapPage() {
           className="absolute right-3 top-3 z-10 flex flex-col gap-2"
           style={{ top: "calc(0.75rem)" }}
         >
-          {/* Recentrar Norte — visible only when the map is rotated. Drag to rotate; click to reset. */}
-          {(heading > 0.5 && heading < 359.5) && (
-            <button
-              ref={compassRef}
-              onPointerDown={onCompassPointerDown}
-              onPointerMove={onCompassPointerMove}
-              onPointerUp={onCompassPointerUp}
-              onPointerCancel={onCompassPointerUp}
-              className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
-              style={{ cursor: compassDragging ? "grabbing" : "grab" }}
-              aria-label="Recentrar Norte"
-              title="Clique: Recentrar Norte · Arraste: rotacionar"
+          {/* Bússola — sempre visível. Clique: norte; arraste: rotacionar. */}
+          <button
+            ref={compassRef}
+            onPointerDown={onCompassPointerDown}
+            onPointerMove={onCompassPointerMove}
+            onPointerUp={onCompassPointerUp}
+            onPointerCancel={onCompassPointerUp}
+            className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            style={{ cursor: compassDragging ? "grabbing" : "grab" }}
+            aria-label="Bússola: voltar ao norte"
+            title="Clique: voltar ao norte · Arraste: rotacionar"
+          >
+            <div
+              className="relative h-6 w-6"
+              style={{ transform: `rotate(${-heading}deg)`, transition: adjusting || compassDragging ? "none" : "transform 120ms" }}
             >
-              <div
-                className="relative h-6 w-6"
-                style={{ transform: `rotate(${-heading}deg)`, transition: adjusting || compassDragging ? "none" : "transform 120ms" }}
-              >
-                <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
-                <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
-              </div>
-            </button>
-          )}
+              <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
+            </div>
+          </button>
 
 
           {/* Layers menu */}
