@@ -144,6 +144,11 @@ function MapPage() {
           minZoom: 3,
           maxZoom: 21,
           mapTypeId: mapType,
+          // Vector rendering is required for native two-finger rotate & tilt.
+          // DEMO_MAP_ID is Google's public evaluation ID — no Cloud Console
+          // setup needed.
+          mapId: "DEMO_MAP_ID",
+          renderingType: google.maps.RenderingType?.VECTOR,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
@@ -152,8 +157,7 @@ function MapPage() {
           scaleControl: false,
           gestureHandling: "greedy",
           isFractionalZoomEnabled: true,
-          tilt: 0,
-          heading: 0,
+          // Do NOT force tilt/heading to 0 — that would reset user rotation.
           clickableIcons: false,
           keyboardShortcuts: false,
           backgroundColor: "#e8eaed",
@@ -163,6 +167,7 @@ function MapPage() {
             strictBounds: true,
           },
         });
+
         mapRef.current = map;
         map.addListener("heading_changed", () => {
           setHeading(map.getHeading() || 0);
