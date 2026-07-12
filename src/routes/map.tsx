@@ -443,19 +443,18 @@ function MapPage() {
     if (!userDotRef.current) {
       const el = document.createElement("div");
       el.className = "user-loc";
+      el.style.position = "absolute";
+      el.style.left = "0";
+      el.style.top = "0";
+      el.style.willChange = "transform";
+      el.style.pointerEvents = "none";
       el.innerHTML = '<div class="user-loc__pulse"></div><div class="user-loc__dot"></div>';
-      // IMPORTANT: no CSS transition on left/top — OverlayView.draw() runs on
-      // every pan/zoom frame. A transition here makes the dot lag behind the
-      // map (looking like it is "stuck to the screen"). Position updates are
-      // instant so the dot stays anchored to its geographic coordinates.
-
 
       class UserOverlay extends google.maps.OverlayView {
         position: any = null;
         div: HTMLDivElement = el;
         onAdd() {
           const panes = this.getPanes();
-          // floatPane sits above markers so the dot never gets occluded
           panes.floatPane.appendChild(this.div);
         }
         draw() {
@@ -464,8 +463,9 @@ function MapPage() {
           if (!proj) return;
           const pt = proj.fromLatLngToDivPixel(this.position);
           if (!pt) return;
-          this.div.style.left = pt.x + "px";
-          this.div.style.top = pt.y + "px";
+          // GPU-accelerated positioning: translate3d avoids layout reflow on
+          // every pan/zoom/rotate frame, keeping the overlay at 60 FPS.
+          this.div.style.transform = `translate3d(${pt.x}px, ${pt.y}px, 0)`;
         }
         onRemove() {
           if (this.div.parentNode) this.div.parentNode.removeChild(this.div);
