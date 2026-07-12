@@ -155,7 +155,14 @@ function MapPage() {
           streetViewControl: false,
           fullscreenControl: false,
           zoomControl: false,
+          cameraControl: true,
+          cameraControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_TOP,
+          },
           rotateControl: true,
+          rotateControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_TOP,
+          },
           scaleControl: false,
           gestureHandling: "greedy",
           isFractionalZoomEnabled: true,
@@ -171,6 +178,7 @@ function MapPage() {
           headingInteractionEnabled: true,
           tiltInteractionEnabled: true,
           rotateControl: true,
+          cameraControl: true,
         });
         if (typeof map.setHeadingInteractionEnabled === "function") {
           map.setHeadingInteractionEnabled(true);
