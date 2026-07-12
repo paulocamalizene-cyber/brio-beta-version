@@ -170,7 +170,16 @@ function MapPage() {
         map.addListener("tilt_changed", () => {
           setTilt(map.getTilt() || 0);
         });
+        // User gestures (drag/pinch) disable tracking — the map should never
+        // snap back to the user's location while they're exploring.
+        map.addListener("dragstart", () => {
+          if (trackingRef.current) {
+            trackingRef.current = false;
+            setTracking(false);
+          }
+        });
         setReady(true);
+
       })
       .catch((err) => {
         console.error(err);
