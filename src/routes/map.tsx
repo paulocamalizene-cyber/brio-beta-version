@@ -714,7 +714,11 @@ function MapPage() {
 
       {/* Map */}
       <div className="relative flex-1 overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0 overscroll-contain" />
+        <div
+          ref={containerRef}
+          className="absolute inset-0 overscroll-contain"
+          style={{ touchAction: "none", contain: "strict" }}
+        />
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
