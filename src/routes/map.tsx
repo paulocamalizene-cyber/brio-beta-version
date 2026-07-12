@@ -95,16 +95,16 @@ function MapPage() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // User location refs
+  // User location refs — the blue dot is only created/shown after the user
+  // explicitly taps "Minha Localização" AND the browser grants permission.
   const userDotRef = useRef<any>(null);
-  const userAccuracyRef = useRef<any>(null);
-  const userHeadingRef = useRef<any>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
-  const userBearingRef = useRef<number | null>(null);
   const mapHeadingRef = useRef(0);
   const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
   const [locating, setLocating] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
 
 
 
@@ -222,12 +222,11 @@ function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function updateUserHeadingMarkerRotation(bearing = userBearingRef.current) {
-    if (!userHeadingRef.current || bearing == null || Number.isNaN(bearing)) return;
-    const icon = userHeadingRef.current.getIcon() || {};
-    const rotation = (bearing - mapHeadingRef.current + 360) % 360;
-    userHeadingRef.current.setIcon({ ...icon, rotation });
+  function updateUserHeadingMarkerRotation(_bearing?: number | null) {
+    // Direction arrow removed — nothing to rotate. Kept as a no-op so existing
+    // call sites (compass drag, keyboard rotate, map heading changes) stay simple.
   }
+
 
   // Desktop affordance: Shift/Ctrl/⌘ + mouse drag → rotate (horizontal) and tilt (vertical).
   useEffect(() => {
@@ -457,18 +456,17 @@ function MapPage() {
   }, [filteredEvents, ready]);
 
 
-  // Watch user location continuously and render a Google-Maps-style blue dot
-  // with an accuracy circle. Runs independently from event markers so it is
-  // never cleared by marker sync / map camera changes.
+  // Watch the user's location and render the Google-Maps-style blue dot ONLY
+  // after the user has explicitly opted in via the "Minha Localização" button
+  // and permission has been granted. Nothing runs until `locationEnabled` is
+  // true, so on first load no indicator is created or shown.
   useEffect(() => {
     if (!ready || !mapRef.current) return;
+    if (!locationEnabled) return;
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     const google = (window as any).google;
     const map = mapRef.current;
 
-    // Build persistent user-location overlay once. Uses OverlayView so we can
-    // render an HTML element with a CSS-animated pulsing aura — smooth and
-    // GPU-accelerated, independent of map camera changes (zoom/rotate/pan).
     if (!userDotRef.current) {
       const el = document.createElement("div");
       el.className = "user-loc";
@@ -492,8 +490,6 @@ function MapPage() {
           if (!proj) return;
           const pt = proj.fromLatLngToDivPixel(this.position);
           if (!pt) return;
-          // GPU-accelerated positioning: translate3d avoids layout reflow on
-          // every pan/zoom/rotate frame, keeping the overlay at 60 FPS.
           this.div.style.transform = `translate3d(${pt.x}px, ${pt.y}px, 0)`;
         }
         onRemove() {
@@ -509,41 +505,24 @@ function MapPage() {
       userDotRef.current = overlay;
     }
 
-    // Optional heading indicator (triangle) — hidden until we have a heading
-    if (!userHeadingRef.current) {
-      userHeadingRef.current = new google.maps.Marker({
-        map: null,
-        clickable: false,
-        zIndex: 999,
-        optimized: false,
-        icon: {
-          path: "M 0,-22 L 8,-6 L 0,-10 L -8,-6 Z",
-          fillColor: "#4285F4",
-          fillOpacity: 0.9,
-          strokeColor: "#ffffff",
-          strokeWeight: 1,
-          rotation: 0,
-        },
-      });
+    // Seed the dot at the last known position immediately so it is stable.
+    if (lastUserPosRef.current) {
+      userDotRef.current.setPosition(
+        new google.maps.LatLng(lastUserPosRef.current.lat, lastUserPosRef.current.lng),
+      );
     }
 
     const onPos = (pos: GeolocationPosition) => {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       lastUserPosRef.current = p;
       setLocPermission("granted");
-      const latLng = new google.maps.LatLng(p.lat, p.lng);
-      userDotRef.current.setPosition(latLng);
-      if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
-        userBearingRef.current = pos.coords.heading;
-        userHeadingRef.current.setPosition(p);
-        updateUserHeadingMarkerRotation(pos.coords.heading);
-        if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
-      }
+      userDotRef.current.setPosition(new google.maps.LatLng(p.lat, p.lng));
     };
-
-
     const onErr = (err: GeolocationPositionError) => {
-      if (err.code === err.PERMISSION_DENIED) setLocPermission("denied");
+      if (err.code === err.PERMISSION_DENIED) {
+        setLocPermission("denied");
+        setLocationEnabled(false);
+      }
     };
 
     watchIdRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
@@ -552,61 +531,39 @@ function MapPage() {
       timeout: 15000,
     });
 
-    // Device orientation as heading fallback (mobile compass)
-    const onOrient = (e: DeviceOrientationEvent) => {
-      const anyE = e as any;
-      const alpha = anyE.webkitCompassHeading != null ? anyE.webkitCompassHeading : (e.alpha != null ? 360 - e.alpha : null);
-      if (alpha == null || Number.isNaN(alpha) || !lastUserPosRef.current) return;
-      userBearingRef.current = alpha;
-      userHeadingRef.current.setPosition(lastUserPosRef.current);
-      updateUserHeadingMarkerRotation(alpha);
-      if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
-    };
-    window.addEventListener("deviceorientationabsolute" as any, onOrient as any, true);
-    window.addEventListener("deviceorientation", onOrient, true);
-
     return () => {
       if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
-      window.removeEventListener("deviceorientationabsolute" as any, onOrient as any, true);
-      window.removeEventListener("deviceorientation", onOrient, true);
     };
-  }, [ready]);
+  }, [ready, locationEnabled]);
+
 
   function locateMe() {
     if (!ready || !mapRef.current) return;
-    setLocating(true);
-    if (lastUserPosRef.current) {
-      mapRef.current.panTo(lastUserPosRef.current);
-      window.setTimeout(() => setLocating(false), 500);
-      return;
-    }
     if (!navigator.geolocation) {
-      setLocating(false);
       setError("Geolocalização não suportada neste dispositivo.");
+      setTimeout(() => setError(null), 4000);
       return;
     }
-    // iOS 13+: request permission for device orientation on user gesture
-    const anyDOE = (window as any).DeviceOrientationEvent;
-    if (anyDOE && typeof anyDOE.requestPermission === "function") {
-      anyDOE.requestPermission().catch(() => {});
-    }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastUserPosRef.current = p;
         setLocPermission("granted");
-        const google = (window as any).google;
-        if (userDotRef.current && google?.maps) {
-          userDotRef.current.setPosition(new google.maps.LatLng(p.lat, p.lng));
-        }
+        // Enabling location mounts the persistent blue-dot overlay + watch.
+        setLocationEnabled(true);
+        // One-shot recenter — the map does NOT follow the user afterwards.
+        const currentZoom = mapRef.current.getZoom() || 12;
         mapRef.current.panTo(p);
+        if (currentZoom < 15) mapRef.current.setZoom(16);
         setLocating(false);
       },
       (err) => {
         setLocating(false);
         if (err.code === err.PERMISSION_DENIED) {
           setLocPermission("denied");
+          setLocationEnabled(false);
           setError("Permissão de localização negada. Ative-a nas configurações do navegador.");
           setTimeout(() => setError(null), 4000);
         }
@@ -614,6 +571,7 @@ function MapPage() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }
+
 
 
 
