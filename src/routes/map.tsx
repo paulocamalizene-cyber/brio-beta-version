@@ -783,14 +783,16 @@ function MapPage() {
           </button>
         </div>
 
-        {/* Locate me — bottom right */}
+        {/* Locate me — bottom right. Filled when tracking is active. */}
         <button
           onClick={locateMe}
-          className="absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-border transition hover:opacity-90 active:scale-95"
+          className={`absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
           aria-label="Minha localização"
+          aria-pressed={tracking}
         >
           <LocateFixed className="h-5 w-5" />
         </button>
+
 
         {/* Selected event card */}
         {selected && (
