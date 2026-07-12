@@ -401,23 +401,51 @@ function MapPage() {
       const key = ev.id;
       seen.add(key);
       let marker = markersRef.current.get(key);
-      const pos = { lat: loc.lat!, lng: loc.lng! };
-      const icon = {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 9,
-        fillColor: ev.color,
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 2,
-      };
+      const lat = loc.lat!;
+      const lng = loc.lng!;
       if (!marker) {
-        marker = new google.maps.Marker({ position: pos, map, title: ev.title, icon });
+        marker = new google.maps.Marker({
+          position: { lat, lng },
+          map,
+          title: ev.title,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: ev.color,
+            fillOpacity: 1,
+            strokeColor: "#fff",
+            strokeWeight: 2,
+          },
+          optimized: true,
+        });
+        marker.__meta = { lat, lng, color: ev.color, title: ev.title };
         marker.addListener("click", () => setSelectedId(ev.id));
         markersRef.current.set(key, marker);
       } else {
-        marker.setPosition(pos);
-        marker.setTitle(ev.title);
-        marker.setIcon(icon);
+        // Only touch the marker when something actually changed. Every
+        // setPosition/setIcon call schedules a redraw on the map's marker
+        // pane, which competes with the gesture pipeline.
+        const meta = marker.__meta || {};
+        if (meta.lat !== lat || meta.lng !== lng) {
+          marker.setPosition({ lat, lng });
+          meta.lat = lat; meta.lng = lng;
+        }
+        if (meta.title !== ev.title) {
+          marker.setTitle(ev.title);
+          meta.title = ev.title;
+        }
+        if (meta.color !== ev.color) {
+          marker.setIcon({
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: ev.color,
+            fillOpacity: 1,
+            strokeColor: "#fff",
+            strokeWeight: 2,
+          });
+          meta.color = ev.color;
+        }
+        marker.__meta = meta;
       }
     }
     for (const [id, m] of markersRef.current) {
@@ -427,6 +455,7 @@ function MapPage() {
       }
     }
   }, [filteredEvents, ready]);
+
 
   // Watch user location continuously and render a Google-Maps-style blue dot
   // with an accuracy circle. Runs independently from event markers so it is
