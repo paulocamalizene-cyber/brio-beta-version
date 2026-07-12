@@ -593,7 +593,11 @@ function MapPage() {
   }
 
   return (
-    <main className="relative flex h-screen flex-col bg-background text-foreground">
+    <main
+      className="fixed inset-0 z-0 flex flex-col overflow-hidden bg-background text-foreground"
+      style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}
+    >
+
       {/* Compact top bar: title + search only. Layers moved into the map. */}
       <header
         className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur"
