@@ -415,7 +415,7 @@ function MapPage() {
 
   // Watch user location continuously and render a Google-Maps-style blue dot
   // with an accuracy circle. Runs independently from event markers so it is
-  // never cleared by fitBounds / marker sync / map camera changes.
+  // never cleared by marker sync / map camera changes.
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
@@ -670,7 +670,7 @@ function MapPage() {
 
       {/* Map */}
       <div className="relative flex-1 overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0 touch-none overscroll-contain" />
+        <div ref={containerRef} className="absolute inset-0 overscroll-contain" />
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
