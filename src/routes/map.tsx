@@ -540,38 +540,30 @@ function MapPage() {
 
   function locateMe() {
     if (!ready || !mapRef.current) return;
-    setLocating(true);
-    if (lastUserPosRef.current) {
-      mapRef.current.panTo(lastUserPosRef.current);
-      window.setTimeout(() => setLocating(false), 500);
-      return;
-    }
     if (!navigator.geolocation) {
-      setLocating(false);
       setError("Geolocalização não suportada neste dispositivo.");
+      setTimeout(() => setError(null), 4000);
       return;
     }
-    // iOS 13+: request permission for device orientation on user gesture
-    const anyDOE = (window as any).DeviceOrientationEvent;
-    if (anyDOE && typeof anyDOE.requestPermission === "function") {
-      anyDOE.requestPermission().catch(() => {});
-    }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastUserPosRef.current = p;
         setLocPermission("granted");
-        const google = (window as any).google;
-        if (userDotRef.current && google?.maps) {
-          userDotRef.current.setPosition(new google.maps.LatLng(p.lat, p.lng));
-        }
+        // Enabling location mounts the persistent blue-dot overlay + watch.
+        setLocationEnabled(true);
+        // One-shot recenter — the map does NOT follow the user afterwards.
+        const currentZoom = mapRef.current.getZoom() || 12;
         mapRef.current.panTo(p);
+        if (currentZoom < 15) mapRef.current.setZoom(16);
         setLocating(false);
       },
       (err) => {
         setLocating(false);
         if (err.code === err.PERMISSION_DENIED) {
           setLocPermission("denied");
+          setLocationEnabled(false);
           setError("Permissão de localização negada. Ative-a nas configurações do navegador.");
           setTimeout(() => setError(null), 4000);
         }
@@ -579,6 +571,7 @@ function MapPage() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }
+
 
 
 
