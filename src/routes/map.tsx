@@ -145,19 +145,19 @@ function MapPage() {
           maxZoom: 21,
           mapTypeId: mapType,
           // Vector rendering is required for native two-finger rotate & tilt.
-          // DEMO_MAP_ID is Google's public evaluation ID — no Cloud Console
-          // setup needed.
-          mapId: "DEMO_MAP_ID",
           renderingType: google.maps.RenderingType?.VECTOR,
+          headingInteractionEnabled: true,
+          tiltInteractionEnabled: true,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
           zoomControl: false,
-          rotateControl: false,
+          rotateControl: true,
           scaleControl: false,
           gestureHandling: "greedy",
           isFractionalZoomEnabled: true,
-          // Do NOT force tilt/heading to 0 — that would reset user rotation.
+          // Do NOT force heading to 0 — that would reset user rotation.
+          tilt: 45,
           clickableIcons: false,
           keyboardShortcuts: false,
           backgroundColor: "#e8eaed",
@@ -169,6 +169,12 @@ function MapPage() {
         });
 
         mapRef.current = map;
+        if (typeof map.setHeadingInteractionEnabled === "function") {
+          map.setHeadingInteractionEnabled(true);
+        }
+        if (typeof map.setTiltInteractionEnabled === "function") {
+          map.setTiltInteractionEnabled(true);
+        }
         map.addListener("heading_changed", () => {
           setHeading(map.getHeading() || 0);
         });
