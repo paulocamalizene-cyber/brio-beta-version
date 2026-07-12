@@ -144,6 +144,11 @@ function MapPage() {
           minZoom: 3,
           maxZoom: 21,
           mapTypeId: mapType,
+          // Vector rendering is required for native two-finger rotate & tilt.
+          // DEMO_MAP_ID is Google's public evaluation ID — no Cloud Console
+          // setup needed.
+          mapId: "DEMO_MAP_ID",
+          renderingType: google.maps.RenderingType?.VECTOR,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
@@ -152,8 +157,7 @@ function MapPage() {
           scaleControl: false,
           gestureHandling: "greedy",
           isFractionalZoomEnabled: true,
-          tilt: 0,
-          heading: 0,
+          // Do NOT force tilt/heading to 0 — that would reset user rotation.
           clickableIcons: false,
           keyboardShortcuts: false,
           backgroundColor: "#e8eaed",
@@ -163,6 +167,7 @@ function MapPage() {
             strictBounds: true,
           },
         });
+
         mapRef.current = map;
         map.addListener("heading_changed", () => {
           setHeading(map.getHeading() || 0);
@@ -191,84 +196,46 @@ function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Native gesture handlers on the map container:
-  //   • Mobile: two fingers → rotate (compute angle between touches). Pinch zoom
-  //     still runs since we don't preventDefault, we just piggyback the angle
-  //     delta into map.setHeading.
-  //   • Desktop: Shift or Ctrl + mouse drag → rotate.
+  // Vector maps handle two-finger rotate/tilt natively. We only add a desktop
+  // affordance: Shift/Ctrl/⌘ + mouse drag → rotate (horizontal) and tilt (vertical).
   useEffect(() => {
     if (!ready || !containerRef.current || !mapRef.current) return;
     const el = containerRef.current;
     const map = mapRef.current;
 
-    let touchStartAngle: number | null = null;
-    let touchStartHeading = 0;
-
-    const angleBetween = (t1: Touch, t2: Touch) =>
-      (Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180) / Math.PI;
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        touchStartAngle = angleBetween(e.touches[0], e.touches[1]);
-        touchStartHeading = map.getHeading() || 0;
-      } else {
-        touchStartAngle = null;
-      }
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 2 || touchStartAngle == null) return;
-      const a = angleBetween(e.touches[0], e.touches[1]);
-      const delta = a - touchStartAngle;
-      let h = (touchStartHeading + delta) % 360;
-      if (h < 0) h += 360;
-      map.setHeading(h);
-    };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) touchStartAngle = null;
-    };
-
-    let mouseRotating = false;
-    let mouseStart: { x: number; y: number; h: number; t: number } | null = null;
+    let rotating = false;
+    let start: { x: number; y: number; h: number; t: number } | null = null;
     const onMouseDown = (e: MouseEvent) => {
       if (!(e.shiftKey || e.ctrlKey || e.metaKey)) return;
-      mouseRotating = true;
-      mouseStart = { x: e.clientX, y: e.clientY, h: map.getHeading() || 0, t: map.getTilt() || 0 };
+      rotating = true;
+      start = { x: e.clientX, y: e.clientY, h: map.getHeading() || 0, t: map.getTilt() || 0 };
       e.stopPropagation();
       e.preventDefault();
     };
     const onMouseMove = (e: MouseEvent) => {
-      if (!mouseRotating || !mouseStart) return;
-      const dx = e.clientX - mouseStart.x;
-      const dy = e.clientY - mouseStart.y;
-      let h = (mouseStart.h + dx * 0.6) % 360;
+      if (!rotating || !start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      let h = (start.h + dx * 0.6) % 360;
       if (h < 0) h += 360;
       map.setHeading(h);
-      map.setTilt(Math.max(0, Math.min(67.5, mouseStart.t - dy * 0.3)));
+      map.setTilt(Math.max(0, Math.min(67.5, start.t - dy * 0.3)));
     };
     const onMouseUp = () => {
-      mouseRotating = false;
-      mouseStart = null;
+      rotating = false;
+      start = null;
     };
 
-    // Capture phase so we run before Google consumes the events.
-    el.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: true, capture: true });
-    el.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
-    el.addEventListener("touchcancel", onTouchEnd, { passive: true, capture: true });
     el.addEventListener("mousedown", onMouseDown, { capture: true });
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
-
     return () => {
-      el.removeEventListener("touchstart", onTouchStart, { capture: true } as any);
-      el.removeEventListener("touchmove", onTouchMove, { capture: true } as any);
-      el.removeEventListener("touchend", onTouchEnd, { capture: true } as any);
-      el.removeEventListener("touchcancel", onTouchEnd, { capture: true } as any);
       el.removeEventListener("mousedown", onMouseDown, { capture: true } as any);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, [ready]);
+
 
 
   // One-finger rotate/tilt: two-finger gestures already handled by Google,
