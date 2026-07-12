@@ -593,7 +593,11 @@ function MapPage() {
   }
 
   return (
-    <main className="relative flex h-screen flex-col bg-background text-foreground">
+    <main
+      className="fixed inset-0 z-0 flex flex-col overflow-hidden bg-background text-foreground"
+      style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}
+    >
+
       {/* Compact top bar: title + search only. Layers moved into the map. */}
       <header
         className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur"
@@ -786,7 +790,7 @@ function MapPage() {
         {/* Locate me — bottom right. Filled when tracking is active. */}
         <button
           onClick={locateMe}
-          className={`absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          className={`absolute right-3 bottom-4 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
           aria-label="Minha localização"
           aria-pressed={tracking}
         >
@@ -796,7 +800,7 @@ function MapPage() {
 
         {/* Selected event card */}
         {selected && (
-          <div className="absolute left-3 right-3 bottom-[calc(80px+env(safe-area-inset-bottom))] z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
+          <div className="absolute left-3 right-3 bottom-4 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
             <div className="flex items-start gap-3">
               <span className="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-full" style={{ background: selected.color }} />
               <div className="min-w-0 flex-1">
