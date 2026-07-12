@@ -62,6 +62,7 @@ function loadGoogleMaps(): Promise<void> {
     const s = document.createElement("script");
     const params = new URLSearchParams({
       key: key || "",
+      v: "weekly",
       loading: "async",
       callback: "__initGoogleMap",
       libraries: "places,geocoding",
@@ -161,13 +162,8 @@ function MapPage() {
           // Do NOT force heading to 0 — that would reset user rotation.
           tilt: 45,
           clickableIcons: false,
-          keyboardShortcuts: false,
           backgroundColor: "#e8eaed",
           disableDefaultUI: true,
-          restriction: {
-            latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
-            strictBounds: true,
-          },
         });
 
         mapRef.current = map;
