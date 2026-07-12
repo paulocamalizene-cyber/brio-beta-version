@@ -467,6 +467,10 @@ function MapPage() {
       setLocPermission("granted");
       const latLng = new google.maps.LatLng(p.lat, p.lng);
       userDotRef.current.setPosition(latLng);
+      // Camera only follows when the user explicitly enabled tracking.
+      if (trackingRef.current) {
+        map.panTo(p);
+      }
       if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
         const icon = userHeadingRef.current.getIcon();
         userHeadingRef.current.setPosition(p);
@@ -474,6 +478,7 @@ function MapPage() {
         if (!userHeadingRef.current.getMap()) userHeadingRef.current.setMap(map);
       }
     };
+
 
     const onErr = (err: GeolocationPositionError) => {
       if (err.code === err.PERMISSION_DENIED) setLocPermission("denied");
