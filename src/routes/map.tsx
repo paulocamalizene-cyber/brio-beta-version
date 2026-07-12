@@ -109,7 +109,10 @@ function MapPage() {
 
 
 
-  // Load events
+  // Load events. Use storage events + visibility change instead of a 2s
+  // interval — the interval caused a re-render every 2s which invalidated
+  // memoised event lists and forced a full marker re-sync, stealing frames
+  // from the map's gesture handling on mobile.
   useEffect(() => {
     const read = () => {
       try {
@@ -123,11 +126,12 @@ function MapPage() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) read();
     };
+    const onVis = () => { if (document.visibilityState === "visible") read(); };
     window.addEventListener("storage", onStorage);
-    const t = setInterval(read, 2000);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("storage", onStorage);
-      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 
@@ -188,11 +192,22 @@ function MapPage() {
         if (typeof map.setTiltInteractionEnabled === "function") {
           map.setTiltInteractionEnabled(true);
         }
+        // Throttle heading updates to the browser's paint clock. Google's
+        // native gesture engine fires heading_changed on every animation
+        // frame during a two-finger rotate; calling setState synchronously
+        // there triggers a React render per frame, which starves the
+        // gesture thread on mid-range mobiles. We coalesce to one React
+        // update per rAF and keep the marker rotation in a plain ref.
+        let headingRaf = 0;
         map.addListener("heading_changed", () => {
           const nextHeading = map.getHeading() || 0;
           mapHeadingRef.current = nextHeading;
-          setHeading(nextHeading);
           updateUserHeadingMarkerRotation();
+          if (headingRaf) return;
+          headingRaf = requestAnimationFrame(() => {
+            headingRaf = 0;
+            setHeading(mapHeadingRef.current);
+          });
         });
         setReady(true);
 
@@ -386,23 +401,51 @@ function MapPage() {
       const key = ev.id;
       seen.add(key);
       let marker = markersRef.current.get(key);
-      const pos = { lat: loc.lat!, lng: loc.lng! };
-      const icon = {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 9,
-        fillColor: ev.color,
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 2,
-      };
+      const lat = loc.lat!;
+      const lng = loc.lng!;
       if (!marker) {
-        marker = new google.maps.Marker({ position: pos, map, title: ev.title, icon });
+        marker = new google.maps.Marker({
+          position: { lat, lng },
+          map,
+          title: ev.title,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: ev.color,
+            fillOpacity: 1,
+            strokeColor: "#fff",
+            strokeWeight: 2,
+          },
+          optimized: true,
+        });
+        marker.__meta = { lat, lng, color: ev.color, title: ev.title };
         marker.addListener("click", () => setSelectedId(ev.id));
         markersRef.current.set(key, marker);
       } else {
-        marker.setPosition(pos);
-        marker.setTitle(ev.title);
-        marker.setIcon(icon);
+        // Only touch the marker when something actually changed. Every
+        // setPosition/setIcon call schedules a redraw on the map's marker
+        // pane, which competes with the gesture pipeline.
+        const meta = marker.__meta || {};
+        if (meta.lat !== lat || meta.lng !== lng) {
+          marker.setPosition({ lat, lng });
+          meta.lat = lat; meta.lng = lng;
+        }
+        if (meta.title !== ev.title) {
+          marker.setTitle(ev.title);
+          meta.title = ev.title;
+        }
+        if (meta.color !== ev.color) {
+          marker.setIcon({
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: ev.color,
+            fillOpacity: 1,
+            strokeColor: "#fff",
+            strokeWeight: 2,
+          });
+          meta.color = ev.color;
+        }
+        marker.__meta = meta;
       }
     }
     for (const [id, m] of markersRef.current) {
@@ -412,6 +455,7 @@ function MapPage() {
       }
     }
   }, [filteredEvents, ready]);
+
 
   // Watch user location continuously and render a Google-Maps-style blue dot
   // with an accuracy circle. Runs independently from event markers so it is
@@ -428,19 +472,18 @@ function MapPage() {
     if (!userDotRef.current) {
       const el = document.createElement("div");
       el.className = "user-loc";
+      el.style.position = "absolute";
+      el.style.left = "0";
+      el.style.top = "0";
+      el.style.willChange = "transform";
+      el.style.pointerEvents = "none";
       el.innerHTML = '<div class="user-loc__pulse"></div><div class="user-loc__dot"></div>';
-      // IMPORTANT: no CSS transition on left/top — OverlayView.draw() runs on
-      // every pan/zoom frame. A transition here makes the dot lag behind the
-      // map (looking like it is "stuck to the screen"). Position updates are
-      // instant so the dot stays anchored to its geographic coordinates.
-
 
       class UserOverlay extends google.maps.OverlayView {
         position: any = null;
         div: HTMLDivElement = el;
         onAdd() {
           const panes = this.getPanes();
-          // floatPane sits above markers so the dot never gets occluded
           panes.floatPane.appendChild(this.div);
         }
         draw() {
@@ -449,8 +492,9 @@ function MapPage() {
           if (!proj) return;
           const pt = proj.fromLatLngToDivPixel(this.position);
           if (!pt) return;
-          this.div.style.left = pt.x + "px";
-          this.div.style.top = pt.y + "px";
+          // GPU-accelerated positioning: translate3d avoids layout reflow on
+          // every pan/zoom/rotate frame, keeping the overlay at 60 FPS.
+          this.div.style.transform = `translate3d(${pt.x}px, ${pt.y}px, 0)`;
         }
         onRemove() {
           if (this.div.parentNode) this.div.parentNode.removeChild(this.div);
@@ -670,7 +714,11 @@ function MapPage() {
 
       {/* Map */}
       <div className="relative flex-1 overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0 overscroll-contain" />
+        <div
+          ref={containerRef}
+          className="absolute inset-0 overscroll-contain"
+          style={{ touchAction: "none", contain: "strict" }}
+        />
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
