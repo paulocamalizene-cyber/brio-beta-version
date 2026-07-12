@@ -95,16 +95,16 @@ function MapPage() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // User location refs
+  // User location refs — the blue dot is only created/shown after the user
+  // explicitly taps "Minha Localização" AND the browser grants permission.
   const userDotRef = useRef<any>(null);
-  const userAccuracyRef = useRef<any>(null);
-  const userHeadingRef = useRef<any>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastUserPosRef = useRef<{ lat: number; lng: number } | null>(null);
-  const userBearingRef = useRef<number | null>(null);
   const mapHeadingRef = useRef(0);
   const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
   const [locating, setLocating] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
 
 
 
