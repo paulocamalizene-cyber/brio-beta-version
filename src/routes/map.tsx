@@ -790,7 +790,7 @@ function MapPage() {
         {/* Locate me — bottom right. Filled when tracking is active. */}
         <button
           onClick={locateMe}
-          className={`absolute right-3 bottom-[calc(96px+env(safe-area-inset-bottom))] z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          className={`absolute right-3 bottom-4 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
           aria-label="Minha localização"
           aria-pressed={tracking}
         >
