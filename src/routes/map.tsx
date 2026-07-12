@@ -222,12 +222,11 @@ function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function updateUserHeadingMarkerRotation(bearing = userBearingRef.current) {
-    if (!userHeadingRef.current || bearing == null || Number.isNaN(bearing)) return;
-    const icon = userHeadingRef.current.getIcon() || {};
-    const rotation = (bearing - mapHeadingRef.current + 360) % 360;
-    userHeadingRef.current.setIcon({ ...icon, rotation });
+  function updateUserHeadingMarkerRotation(_bearing?: number | null) {
+    // Direction arrow removed — nothing to rotate. Kept as a no-op so existing
+    // call sites (compass drag, keyboard rotate, map heading changes) stay simple.
   }
+
 
   // Desktop affordance: Shift/Ctrl/⌘ + mouse drag → rotate (horizontal) and tilt (vertical).
   useEffect(() => {
