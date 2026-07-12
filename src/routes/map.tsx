@@ -87,7 +87,6 @@ function MapPage() {
   const [showLayers, setShowLayers] = useState(false);
   const [trafficOn, setTrafficOn] = useState(false);
   const [heading, setHeading] = useState(0);
-  const [tilt, setTilt] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -95,7 +94,6 @@ function MapPage() {
   const trafficRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const didInitialFitRef = useRef(false);
 
   // User location refs
   const userDotRef = useRef<any>(null);
@@ -106,8 +104,7 @@ function MapPage() {
   const userBearingRef = useRef<number | null>(null);
   const mapHeadingRef = useRef(0);
   const [, setLocPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
-  const [tracking, setTracking] = useState(false);
-  const trackingRef = useRef(false);
+  const [locating, setLocating] = useState(false);
 
 
 
@@ -144,13 +141,15 @@ function MapPage() {
         const map = new google.maps.Map(containerRef.current, {
           center: { lat: -23.5505, lng: -46.6333 },
           zoom: 12,
-          minZoom: 3,
-          maxZoom: 21,
           mapTypeId: mapType,
-          // Vector rendering is required for native two-finger rotate & tilt.
+          // Prioritise native mobile map gestures: drag, pinch, rotate and tilt.
           renderingType: google.maps.RenderingType?.VECTOR,
           headingInteractionEnabled: true,
           tiltInteractionEnabled: true,
+          draggable: true,
+          scrollwheel: true,
+          disableDoubleClickZoom: false,
+          keyboardShortcuts: true,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
@@ -166,8 +165,7 @@ function MapPage() {
           scaleControl: false,
           gestureHandling: "greedy",
           isFractionalZoomEnabled: true,
-          // Do NOT force heading to 0 — that would reset user rotation.
-          tilt: 45,
+          // Do not force heading/tilt. The user's camera angle must persist.
           clickableIcons: false,
           backgroundColor: "#e8eaed",
           disableDefaultUI: true,
@@ -177,6 +175,10 @@ function MapPage() {
         map.setOptions({
           headingInteractionEnabled: true,
           tiltInteractionEnabled: true,
+          draggable: true,
+          scrollwheel: true,
+          disableDoubleClickZoom: false,
+          keyboardShortcuts: true,
           rotateControl: true,
           cameraControl: true,
         });
@@ -191,17 +193,6 @@ function MapPage() {
           mapHeadingRef.current = nextHeading;
           setHeading(nextHeading);
           updateUserHeadingMarkerRotation();
-        });
-        map.addListener("tilt_changed", () => {
-          setTilt(map.getTilt() || 0);
-        });
-        // User gestures (drag/pinch) disable tracking — the map should never
-        // snap back to the user's location while they're exploring.
-        map.addListener("dragstart", () => {
-          if (trackingRef.current) {
-            trackingRef.current = false;
-            setTracking(false);
-          }
         });
         setReady(true);
 
@@ -222,57 +213,6 @@ function MapPage() {
     const rotation = (bearing - mapHeadingRef.current + 360) % 360;
     userHeadingRef.current.setIcon({ ...icon, rotation });
   }
-
-  // Vector maps handle two-finger rotate/tilt natively when the API/browser
-  // supports it. This capture-phase fallback mirrors Google Maps behavior on
-  // devices where the native heading gesture is unavailable or disabled by the
-  // loaded map style: two fingers rotate freely without forcing north again.
-  useEffect(() => {
-    if (!ready || !containerRef.current || !mapRef.current) return;
-    const el = containerRef.current;
-    const map = mapRef.current;
-
-    let rotateGesture: { angle: number; heading: number } | null = null;
-    const touchAngle = (touches: TouchList) => {
-      const a = touches[0];
-      const b = touches[1];
-      return (Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180) / Math.PI;
-    };
-    const normalizeHeading = (value: number) => {
-      const next = value % 360;
-      return next < 0 ? next + 360 : next;
-    };
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      rotateGesture = {
-        angle: touchAngle(e.touches),
-        heading: map.getHeading() || 0,
-      };
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 2 || !rotateGesture) return;
-      const nextHeading = normalizeHeading(
-        rotateGesture.heading + touchAngle(e.touches) - rotateGesture.angle,
-      );
-      map.setHeading(nextHeading);
-      mapHeadingRef.current = nextHeading;
-      updateUserHeadingMarkerRotation();
-    };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) rotateGesture = null;
-    };
-
-    el.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
-    el.addEventListener("touchmove", onTouchMove, { capture: true, passive: true });
-    el.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
-    el.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart, { capture: true } as any);
-      el.removeEventListener("touchmove", onTouchMove, { capture: true } as any);
-      el.removeEventListener("touchend", onTouchEnd, { capture: true } as any);
-      el.removeEventListener("touchcancel", onTouchEnd, { capture: true } as any);
-    };
-  }, [ready]);
 
   // Desktop affordance: Shift/Ctrl/⌘ + mouse drag → rotate (horizontal) and tilt (vertical).
   useEffect(() => {
@@ -314,43 +254,6 @@ function MapPage() {
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, [ready]);
-
-
-
-  // One-finger rotate/tilt: two-finger gestures already handled by Google,
-  // but we add an "Adjust view" overlay activated by long-press to allow
-  // single-finger rotate (drag horizontally) + tilt (drag vertically).
-  const adjustingRef = useRef(false);
-  const adjustStartRef = useRef<{ x: number; y: number; h: number; t: number } | null>(null);
-  const [adjusting, setAdjusting] = useState(false);
-
-  function startAdjust(clientX: number, clientY: number) {
-    if (!mapRef.current) return;
-    adjustingRef.current = true;
-    setAdjusting(true);
-    adjustStartRef.current = {
-      x: clientX,
-      y: clientY,
-      h: mapRef.current.getHeading() || 0,
-      t: mapRef.current.getTilt() || 0,
-    };
-  }
-  function moveAdjust(clientX: number, clientY: number) {
-    if (!adjustingRef.current || !adjustStartRef.current || !mapRef.current) return;
-    const dx = clientX - adjustStartRef.current.x;
-    const dy = clientY - adjustStartRef.current.y;
-    const newHeading = (adjustStartRef.current.h + dx * 0.6) % 360;
-    const newTilt = Math.max(0, Math.min(67.5, adjustStartRef.current.t - dy * 0.3));
-    mapRef.current.setHeading(newHeading < 0 ? newHeading + 360 : newHeading);
-    mapHeadingRef.current = newHeading < 0 ? newHeading + 360 : newHeading;
-    updateUserHeadingMarkerRotation();
-    mapRef.current.setTilt(newTilt);
-  }
-  function endAdjust() {
-    adjustingRef.current = false;
-    setAdjusting(false);
-    adjustStartRef.current = null;
-  }
 
   // Compass drag-to-rotate: press compass and drag around it to rotate the map.
   // If the pointer barely moved, treat as a click → reset to north when not aligned.
@@ -478,8 +381,6 @@ function MapPage() {
     const google = (window as any).google;
     const map = mapRef.current;
     const seen = new Set<string>();
-    const bounds = new google.maps.LatLngBounds();
-    let any = false;
     for (const ev of filteredEvents) {
       const loc = ev.location!;
       const key = ev.id;
@@ -503,8 +404,6 @@ function MapPage() {
         marker.setTitle(ev.title);
         marker.setIcon(icon);
       }
-      bounds.extend(pos);
-      any = true;
     }
     for (const [id, m] of markersRef.current) {
       if (!seen.has(id)) {
@@ -512,20 +411,11 @@ function MapPage() {
         markersRef.current.delete(id);
       }
     }
-    // Only fit bounds ONCE (initial load). fitBounds resets heading/tilt,
-    // which would fight the user's rotation on every event change.
-    if (any && !selectedId && !didInitialFitRef.current) {
-      didInitialFitRef.current = true;
-      try {
-        map.fitBounds(bounds, 80);
-        if (filteredEvents.length === 1) map.setZoom(14);
-      } catch {}
-    }
-  }, [filteredEvents, ready, selectedId]);
+  }, [filteredEvents, ready]);
 
   // Watch user location continuously and render a Google-Maps-style blue dot
   // with an accuracy circle. Runs independently from event markers so it is
-  // never cleared by fitBounds / marker sync / map camera changes.
+  // never cleared by marker sync / map camera changes.
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
@@ -599,10 +489,6 @@ function MapPage() {
       setLocPermission("granted");
       const latLng = new google.maps.LatLng(p.lat, p.lng);
       userDotRef.current.setPosition(latLng);
-      // Camera only follows when the user explicitly enabled tracking.
-      if (trackingRef.current) {
-        map.panTo(p);
-      }
       if (pos.coords.heading != null && !Number.isNaN(pos.coords.heading)) {
         userBearingRef.current = pos.coords.heading;
         userHeadingRef.current.setPosition(p);
@@ -645,18 +531,14 @@ function MapPage() {
 
   function locateMe() {
     if (!ready || !mapRef.current) return;
-    // Enable tracking mode — the button is now "active" and subsequent GPS
-    // fixes will pan the camera. Any user drag disables it again.
-    trackingRef.current = true;
-    setTracking(true);
-    // If we already have a fix, just recenter.
+    setLocating(true);
     if (lastUserPosRef.current) {
       mapRef.current.panTo(lastUserPosRef.current);
-      const z = mapRef.current.getZoom() || 12;
-      if (z < 15) mapRef.current.setZoom(16);
+      window.setTimeout(() => setLocating(false), 500);
       return;
     }
     if (!navigator.geolocation) {
+      setLocating(false);
       setError("Geolocalização não suportada neste dispositivo.");
       return;
     }
@@ -670,14 +552,17 @@ function MapPage() {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastUserPosRef.current = p;
         setLocPermission("granted");
+        const google = (window as any).google;
+        if (userDotRef.current && google?.maps) {
+          userDotRef.current.setPosition(new google.maps.LatLng(p.lat, p.lng));
+        }
         mapRef.current.panTo(p);
-        mapRef.current.setZoom(16);
+        setLocating(false);
       },
       (err) => {
+        setLocating(false);
         if (err.code === err.PERMISSION_DENIED) {
           setLocPermission("denied");
-          trackingRef.current = false;
-          setTracking(false);
           setError("Permissão de localização negada. Ative-a nas configurações do navegador.");
           setTimeout(() => setError(null), 4000);
         }
@@ -691,7 +576,7 @@ function MapPage() {
   function zoomBy(delta: number) {
     if (!mapRef.current) return;
     const z = mapRef.current.getZoom() || 12;
-    mapRef.current.setZoom(Math.max(2, Math.min(21, z + delta)));
+    mapRef.current.setZoom(z + delta);
   }
 
   function resetNorth() {
@@ -785,7 +670,7 @@ function MapPage() {
 
       {/* Map */}
       <div className="relative flex-1 overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0" />
+        <div ref={containerRef} className="absolute inset-0 overscroll-contain" />
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
@@ -798,23 +683,8 @@ function MapPage() {
           </div>
         )}
 
-        {/* Adjust-view overlay: when active, captures pointer to rotate/tilt with one finger */}
-        {adjusting && (
-          <div
-            className="absolute inset-0 z-20 cursor-grabbing touch-none"
-            onPointerMove={(e) => moveAdjust(e.clientX, e.clientY)}
-            onPointerUp={endAdjust}
-            onPointerCancel={endAdjust}
-            onPointerLeave={endAdjust}
-          >
-            <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-background/90 px-3 py-1 text-xs font-medium shadow ring-1 ring-border">
-              Arraste: ↔ rotacionar · ↕ inclinar
-            </div>
-          </div>
-        )}
-
         {/* Angle overlay while rotating */}
-        {(compassDragging || adjusting) && (
+        {compassDragging && (
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/90 px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
             {Math.round(heading)}°
           </div>
@@ -827,26 +697,27 @@ function MapPage() {
           className="absolute right-3 top-3 z-10 flex flex-col gap-2"
           style={{ top: "calc(0.75rem)" }}
         >
-          {/* Bússola — sempre visível. Clique: norte; arraste: rotacionar. */}
-          <button
-            ref={compassRef}
-            onPointerDown={onCompassPointerDown}
-            onPointerMove={onCompassPointerMove}
-            onPointerUp={onCompassPointerUp}
-            onPointerCancel={onCompassPointerUp}
-            className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
-            style={{ cursor: compassDragging ? "grabbing" : "grab" }}
-            aria-label="Bússola: voltar ao norte"
-            title="Clique: voltar ao norte · Arraste: rotacionar"
-          >
-            <div
-              className="relative h-6 w-6"
-              style={{ transform: `rotate(${-heading}deg)`, transition: adjusting || compassDragging ? "none" : "transform 120ms" }}
+          {(Math.abs(heading) > 0.5 || Math.abs(heading - 360) < 0.5 || compassDragging) && (
+            <button
+              ref={compassRef}
+              onPointerDown={onCompassPointerDown}
+              onPointerMove={onCompassPointerMove}
+              onPointerUp={onCompassPointerUp}
+              onPointerCancel={onCompassPointerUp}
+              className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
+              style={{ cursor: compassDragging ? "grabbing" : "grab" }}
+              aria-label="Bússola: voltar ao norte"
+              title="Clique: voltar ao norte · Arraste: rotacionar"
             >
-              <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
-              <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
-            </div>
-          </button>
+              <div
+                className="relative h-6 w-6"
+                style={{ transform: `rotate(${-heading}deg)`, transition: compassDragging ? "none" : "transform 120ms" }}
+              >
+                <Compass className="absolute inset-0 h-6 w-6 text-foreground" />
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-bold text-red-500">N</span>
+              </div>
+            </button>
+          )}
 
 
           {/* Layers menu */}
@@ -903,27 +774,14 @@ function MapPage() {
               <Minus className="h-5 w-5" />
             </button>
           </div>
-
-          {/* Tilt/rotate adjuster — long-press / press-and-drag */}
-          <button
-            onPointerDown={(e) => { e.preventDefault(); startAdjust(e.clientX, e.clientY); }}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none"
-            aria-label="Ajustar inclinação e rotação"
-            title="Pressione e arraste para girar/inclinar"
-          >
-            <Navigation
-              className="h-5 w-5 text-foreground"
-              style={{ transform: `rotate(${tilt > 0 ? 30 : 0}deg)` }}
-            />
-          </button>
         </div>
 
-        {/* Locate me — bottom right. Filled when tracking is active. */}
+        {/* Locate me — one-shot recenter. It never locks/follows the camera. */}
         <button
           onClick={locateMe}
-          className={`absolute right-3 bottom-4 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${tracking ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          className={`absolute right-3 bottom-4 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
           aria-label="Minha localização"
-          aria-pressed={tracking}
+          aria-pressed={locating}
         >
           <LocateFixed className="h-5 w-5" />
         </button>
