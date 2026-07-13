@@ -142,9 +142,14 @@ function MapPage() {
       .then(() => {
         if (cancelled || !containerRef.current) return;
         const google = (window as any).google;
+        const containerHeight = containerRef.current.clientHeight || window.innerHeight;
+        // Minimum zoom that keeps the world tall enough to cover the viewport vertically,
+        // preventing grey/white bars above and below the map.
+        const computedMinZoom = Math.max(2, Math.ceil(Math.log2(containerHeight / 256)));
         const map = new google.maps.Map(containerRef.current, {
           center: { lat: -23.5505, lng: -46.6333 },
           zoom: 12,
+          minZoom: computedMinZoom,
           mapTypeId: mapType,
           // Prioritise native mobile map gestures: drag, pinch, rotate and tilt.
           renderingType: google.maps.RenderingType?.VECTOR,
@@ -171,9 +176,20 @@ function MapPage() {
           isFractionalZoomEnabled: true,
           // Do not force heading/tilt. The user's camera angle must persist.
           clickableIcons: false,
-          backgroundColor: "#e8eaed",
+          // Ocean-tone background so any brief tile-load frame blends with the map.
+          backgroundColor: "#aadaff",
           disableDefaultUI: true,
         });
+
+        // Keep minZoom in sync with viewport size so no empty area appears on resize/rotation.
+        const updateMinZoom = () => {
+          const h = containerRef.current?.clientHeight || window.innerHeight;
+          const mz = Math.max(2, Math.ceil(Math.log2(h / 256)));
+          map.setOptions({ minZoom: mz });
+        };
+        window.addEventListener("resize", updateMinZoom);
+        window.addEventListener("orientationchange", updateMinZoom);
+
 
         mapRef.current = map;
         map.setOptions({
