@@ -145,7 +145,6 @@ function MapPage() {
         const map = new google.maps.Map(containerRef.current, {
           center: { lat: -23.5505, lng: -46.6333 },
           zoom: 12,
-          minZoom: 4,
           mapTypeId: mapType,
           // Prioritise native mobile map gestures: drag, pinch, rotate and tilt.
           renderingType: google.maps.RenderingType?.VECTOR,
