@@ -143,9 +143,12 @@ function MapPage() {
         if (cancelled || !containerRef.current) return;
         const google = (window as any).google;
         const containerHeight = containerRef.current.clientHeight || window.innerHeight;
-        // Minimum zoom that keeps the world tall enough to cover the viewport vertically,
-        // preventing grey/white bars above and below the map.
-        const computedMinZoom = Math.max(2, Math.ceil(Math.log2(containerHeight / 256)));
+        const containerWidth = containerRef.current.clientWidth || window.innerWidth;
+        // Minimum zoom that keeps a single world larger than the viewport in BOTH axes,
+        // so only one planet is ever visible (no horizontal repeats, no grey bars).
+        const computeMinZoom = (w: number, h: number) =>
+          Math.max(2, Math.ceil(Math.log2(Math.max(w, h) / 256)));
+        const computedMinZoom = computeMinZoom(containerWidth, containerHeight);
         const map = new google.maps.Map(containerRef.current, {
           center: { lat: -23.5505, lng: -46.6333 },
           zoom: 12,
@@ -181,14 +184,15 @@ function MapPage() {
           disableDefaultUI: true,
         });
 
-        // Keep minZoom in sync with viewport size so no empty area appears on resize/rotation.
+        // Keep minZoom in sync with viewport size so a single world always fills the screen.
         const updateMinZoom = () => {
           const h = containerRef.current?.clientHeight || window.innerHeight;
-          const mz = Math.max(2, Math.ceil(Math.log2(h / 256)));
-          map.setOptions({ minZoom: mz });
+          const w = containerRef.current?.clientWidth || window.innerWidth;
+          map.setOptions({ minZoom: computeMinZoom(w, h) });
         };
         window.addEventListener("resize", updateMinZoom);
         window.addEventListener("orientationchange", updateMinZoom);
+
 
 
         mapRef.current = map;
