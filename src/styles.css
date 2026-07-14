@@ -100,6 +100,44 @@
   }
 }
 
+/* ==== Glassmorphism tokens & utilities ==== */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --glass-bg-active: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10);
+  --glass-shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.14);
+  --glass-blur: 20px;
+}
+.dark {
+  --glass-bg: rgba(22, 24, 32, 0.5);
+  --glass-bg-strong: rgba(22, 24, 32, 0.7);
+  --glass-bg-active: rgba(255, 255, 255, 0.14);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --glass-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+@utility glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+@utility glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-lg);
+}
+@utility glass-active {
+  background: var(--glass-bg-active);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-lg);
+}
+
 a[href*="lovable.dev"],
 iframe[src*="lovable.dev"],
 div[style*="Edit with Lovable"],
