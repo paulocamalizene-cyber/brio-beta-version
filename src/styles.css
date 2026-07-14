@@ -110,18 +110,18 @@
 
 /* ==== Glassmorphism tokens & utilities ==== */
 :root {
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-strong: rgba(255, 255, 255, 0.72);
-  --glass-bg-active: rgba(255, 255, 255, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10);
-  --glass-shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.14);
+  --glass-bg: rgba(255, 255, 255, 0.12);
+  --glass-bg-strong: rgba(255, 255, 255, 0.18);
+  --glass-bg-active: rgba(255, 255, 255, 0.28);
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --glass-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.18);
   --glass-blur: 20px;
 }
 .dark {
-  --glass-bg: rgba(22, 24, 32, 0.5);
-  --glass-bg-strong: rgba(22, 24, 32, 0.7);
-  --glass-bg-active: rgba(255, 255, 255, 0.14);
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-strong: rgba(255, 255, 255, 0.12);
+  --glass-bg-active: rgba(255, 255, 255, 0.22);
   --glass-border: rgba(255, 255, 255, 0.14);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   --glass-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
