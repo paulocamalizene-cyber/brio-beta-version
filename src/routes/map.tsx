@@ -797,7 +797,8 @@ function MapPage() {
         {/* Locate me — one-shot recenter. It never locks/follows the camera. */}
         <button
           onClick={locateMe}
-          className={`absolute right-3 bottom-4 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          className={`absolute right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
           aria-label="Minha localização"
           aria-pressed={locating}
         >
