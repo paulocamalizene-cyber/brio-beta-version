@@ -182,6 +182,10 @@ function MapPage() {
           // Ocean-tone background so any brief tile-load frame blends with the map.
           backgroundColor: "#aadaff",
           disableDefaultUI: true,
+          restriction: {
+            latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
+            strictBounds: false,
+          },
         });
 
         // Keep minZoom in sync with viewport size so a single world always fills the screen.
