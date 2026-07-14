@@ -355,6 +355,8 @@ function CalendarApp() {
     localStorage.setItem(FAV_KEY, JSON.stringify(favColors));
   }, [favColors]);
 
+  const { statuses: syncStatuses } = useEventsSync(events);
+
   const selectedKey = fmtKey(selected);
 
   // Compute occurrences for selected day with auto-pending
