@@ -3,10 +3,17 @@ import { BottomNav } from "@/components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
+  addMonths,
   differenceInCalendarDays,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
   format,
   isSameDay,
+  isSameMonth,
   parseISO,
+  startOfMonth,
+  startOfWeek,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
