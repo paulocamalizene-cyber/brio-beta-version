@@ -185,16 +185,27 @@ export function useEventsSync(events: LocalEvent[] | null | undefined) {
       const payload = {
         id,
         title: e.title || "Sem título",
-        description: e.description ?? null,
-        location: e.location ?? null,
+        description: e.notes ?? null,
+        location: e.location
+          ? { address: e.location.address, lat: e.location.lat, lng: e.location.lng }
+          : null,
         color: e.color ?? null,
         start_date: e.date,
-        start_time: minToTime(e.startMin),
-        end_time: minToTime(e.endMin),
-        recurrence: e.rrule ?? null,
-        reminders: e.reminders ?? null,
-        attendees: e.attendees ?? null,
-        status_map: e.statusMap ?? {},
+        start_time: minToTime(e.start),
+        end_time: minToTime(e.end),
+        recurrence: recurrenceToRRule(e.recurrence),
+        reminders:
+          e.notifications && e.notifications.length
+            ? {
+                useDefault: false,
+                overrides: e.notifications.map((m) => ({
+                  method: "popup" as const,
+                  minutes: m,
+                })),
+              }
+            : null,
+        attendees: null,
+        status_map: e.statuses ?? {},
       };
       upsert({ data: payload })
         .then(() => {
