@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
 
-export const Route = createFileRoute("/profile")({
+export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
       { title: "Perfil | Agenda" },
