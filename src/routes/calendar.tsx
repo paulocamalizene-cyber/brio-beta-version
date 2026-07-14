@@ -737,7 +737,7 @@ function CalendarApp() {
       </header>
 
       {/* Week strip */}
-      <div className="px-2 pb-2 pt-1">
+      <div className="px-2 pb-2 pt-1 md:hidden">
         <div className="grid grid-cols-7">
           {stripDays.map((d) => {
             const isSel = isSameDay(d, selected);
