@@ -14,7 +14,138 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_user_connections: {
+        Row: {
+          connection_key_ciphertext: string
+          connector_id: string
+          created_at: string
+          google_calendar_id: string | null
+          google_sync_token: string | null
+          id: string
+          last_full_sync_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_key_ciphertext: string
+          connector_id: string
+          created_at?: string
+          google_calendar_id?: string | null
+          google_sync_token?: string | null
+          id?: string
+          last_full_sync_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_key_ciphertext?: string
+          connector_id?: string
+          created_at?: string
+          google_calendar_id?: string | null
+          google_sync_token?: string | null
+          id?: string
+          last_full_sync_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          attendees: Json | null
+          color: string | null
+          created_at: string
+          description: string | null
+          end_time: string | null
+          google_calendar_id: string | null
+          google_etag: string | null
+          google_event_id: string | null
+          id: string
+          last_synced_at: string | null
+          location: Json | null
+          recurrence: string | null
+          reminders: Json | null
+          start_date: string
+          start_time: string | null
+          status_map: Json | null
+          sync_error: string | null
+          sync_status: Database["public"]["Enums"]["event_sync_status"]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attendees?: Json | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          google_calendar_id?: string | null
+          google_etag?: string | null
+          google_event_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          location?: Json | null
+          recurrence?: string | null
+          reminders?: Json | null
+          start_date: string
+          start_time?: string | null
+          status_map?: Json | null
+          sync_error?: string | null
+          sync_status?: Database["public"]["Enums"]["event_sync_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attendees?: Json | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          google_calendar_id?: string | null
+          google_etag?: string | null
+          google_event_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          location?: Json | null
+          recurrence?: string | null
+          reminders?: Json | null
+          start_date?: string
+          start_time?: string | null
+          status_map?: Json | null
+          sync_error?: string | null
+          sync_status?: Database["public"]["Enums"]["event_sync_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +154,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      event_sync_status: "local" | "pending" | "synced" | "error"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +281,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      event_sync_status: ["local", "pending", "synced", "error"],
+    },
   },
 } as const

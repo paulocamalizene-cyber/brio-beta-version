@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BottomNav } from "@/components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useEventsSync, type SyncInfo } from "@/hooks/useEventsSync";
 import {
   addDays,
   addMonths,
@@ -28,6 +29,9 @@ import {
   Trash2,
   X,
   AlertTriangle,
+  CheckCircle2,
+  CloudOff,
+  Loader2,
 } from "lucide-react";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { Button } from "@/components/ui/button";
@@ -64,7 +68,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export const Route = createFileRoute("/calendar")({
+export const Route = createFileRoute("/_authenticated/calendar")({
   head: () => ({
     meta: [
       { title: "Calendário" },
@@ -353,6 +357,8 @@ function CalendarApp() {
   useEffect(() => {
     localStorage.setItem(FAV_KEY, JSON.stringify(favColors));
   }, [favColors]);
+
+  const { statuses: syncStatuses } = useEventsSync(events);
 
   const selectedKey = fmtKey(selected);
 
@@ -867,6 +873,7 @@ function CalendarApp() {
                       if (!movedRef.current) openEdit(o.ev, o.date);
                     }}
                     onSetStatus={(st) => setStatus(o.ev, o.date, st)}
+                    syncInfo={syncStatuses.get(o.ev.id) ?? null}
                   />
                 );
               })}
@@ -1393,6 +1400,7 @@ function EventCard(props: {
   onResizePointerDown: (e: React.PointerEvent, o: Occurrence) => void;
   onOpenEdit: () => void;
   onSetStatus: (s: Status | null) => void;
+  syncInfo?: SyncInfo | null;
 }) {
   const {
     o,
@@ -1409,6 +1417,7 @@ function EventCard(props: {
     onResizePointerDown,
     onOpenEdit,
     onSetStatus,
+    syncInfo,
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const text = readableText(color);
@@ -1449,6 +1458,7 @@ function EventCard(props: {
               style={{ color }}
             />
           )}
+          <SyncBadge info={syncInfo} color={color} />
         </div>
         <p
           className="truncate text-[11px] tabular-nums leading-tight opacity-80"
@@ -1811,5 +1821,42 @@ function MonthSidebar({
         </button>
       </div>
     </aside>
+  );
+}
+
+// ───────────────────────── SyncBadge ─────────────────────────
+function SyncBadge({ info, color }: { info: SyncInfo | null | undefined; color: string }) {
+  if (!info) return null;
+  const commonCls = "h-3 w-3 shrink-0";
+  const title = (() => {
+    switch (info.status) {
+      case "synced":
+        return "Sincronizado com o Google Calendar";
+      case "pending":
+        return "Sincronização pendente";
+      case "error":
+        return info.error ? `Erro: ${info.error.slice(0, 120)}` : "Erro na sincronização";
+      case "local":
+      default:
+        return "Somente local (Google Calendar não conectado)";
+    }
+  })();
+  const icon = (() => {
+    switch (info.status) {
+      case "synced":
+        return <CheckCircle2 className={commonCls} style={{ color }} />;
+      case "pending":
+        return <Loader2 className={`${commonCls} animate-spin opacity-70`} style={{ color }} />;
+      case "error":
+        return <AlertTriangle className={commonCls} style={{ color: "#dc2626" }} />;
+      case "local":
+      default:
+        return <CloudOff className={`${commonCls} opacity-60`} style={{ color }} />;
+    }
+  })();
+  return (
+    <span title={title} aria-label={title}>
+      {icon}
+    </span>
   );
 }
