@@ -1455,6 +1455,7 @@ function EventCard(props: {
               style={{ color }}
             />
           )}
+          <SyncBadge info={syncInfo} color={color} />
         </div>
         <p
           className="truncate text-[11px] tabular-nums leading-tight opacity-80"
