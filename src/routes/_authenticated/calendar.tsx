@@ -870,6 +870,7 @@ function CalendarApp() {
                       if (!movedRef.current) openEdit(o.ev, o.date);
                     }}
                     onSetStatus={(st) => setStatus(o.ev, o.date, st)}
+                    syncInfo={syncStatuses.get(o.ev.id) ?? null}
                   />
                 );
               })}
