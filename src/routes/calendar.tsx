@@ -876,7 +876,7 @@ function CalendarApp() {
       </div>
 
       {/* Bottom bar */}
-      <nav className="flex items-center justify-between border-t border-border bg-secondary/60 px-6 py-2 text-primary">
+      <nav className="flex items-center justify-between border-t border-border bg-secondary/60 px-6 py-2 text-primary md:hidden">
         <button
           onClick={() => setSelected(new Date())}
           className="text-[15px] font-semibold"
