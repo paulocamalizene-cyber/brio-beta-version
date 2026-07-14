@@ -37,62 +37,70 @@
 
 :root {
   --radius: 0.625rem;
-  /* Apple Calendar light */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.15 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0 0);
-  /* Apple red */
-  --primary: oklch(0.62 0.22 27);
+  /* Glass-on-gradient palette */
+  --background: transparent;
+  --foreground: oklch(0.98 0 0);
+  --card: rgba(255, 255, 255, 0.14);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.22 0.03 265);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.72 0.16 300);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.97 0.002 247);
-  --secondary-foreground: oklch(0.15 0 0);
-  --muted: oklch(0.97 0.002 247);
-  --muted-foreground: oklch(0.55 0.005 247);
-  --accent: oklch(0.62 0.22 27);
+  --secondary: rgba(255, 255, 255, 0.12);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: rgba(255, 255, 255, 0.10);
+  --muted-foreground: rgba(255, 255, 255, 0.72);
+  --accent: rgba(255, 255, 255, 0.18);
   --accent-foreground: oklch(1 0 0);
-  --today: oklch(0.62 0.22 27);
-  --destructive: oklch(0.6 0.2 25);
+  --today: oklch(0.75 0.18 300);
+  --destructive: oklch(0.65 0.22 22);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.92 0.003 247);
-  --input: oklch(0.92 0.003 247);
-  --ring: oklch(0.62 0.22 27);
+  --border: rgba(255, 255, 255, 0.18);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: rgba(255, 255, 255, 0.5);
 }
 
 .dark {
-  --background: oklch(0 0 0);
+  --background: transparent;
   --foreground: oklch(0.98 0 0);
-  --card: oklch(0.16 0.003 247);
+  --card: rgba(255, 255, 255, 0.10);
   --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.16 0.003 247);
+  --popover: oklch(0.2 0.02 265);
   --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.66 0.23 27);
+  --primary: oklch(0.72 0.16 300);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.2 0.003 247);
+  --secondary: rgba(255, 255, 255, 0.10);
   --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.2 0.003 247);
-  --muted-foreground: oklch(0.65 0.005 247);
-  --accent: oklch(0.66 0.23 27);
+  --muted: rgba(255, 255, 255, 0.08);
+  --muted-foreground: rgba(255, 255, 255, 0.68);
+  --accent: rgba(255, 255, 255, 0.16);
   --accent-foreground: oklch(1 0 0);
-  --today: oklch(0.66 0.23 27);
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.66 0.23 27);
+  --today: oklch(0.75 0.18 300);
+  --destructive: oklch(0.65 0.22 22);
+  --destructive-foreground: oklch(1 0 0);
+  --border: rgba(255, 255, 255, 0.14);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: rgba(255, 255, 255, 0.4);
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
   }
+  html, body {
+    min-height: 100%;
+  }
   body {
-    background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(1200px 800px at 10% 0%, rgba(102, 126, 234, 0.55), transparent 60%),
+      radial-gradient(1000px 700px at 90% 100%, rgba(236, 72, 153, 0.45), transparent 55%),
+      linear-gradient(135deg, #667eea 0%, #764ba2 55%, #6b3fa0 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
   }
   .font-display {
     font-family: var(--font-display);
