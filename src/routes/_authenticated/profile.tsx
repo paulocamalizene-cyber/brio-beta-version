@@ -137,7 +137,7 @@ function ProfilePage() {
         <p className="mt-1 text-sm text-muted-foreground">Conta e integrações.</p>
       </header>
       <section className="flex-1 space-y-6 px-5 pb-6">
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="glass rounded-2xl p-4">
           <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Conta
           </div>
@@ -153,7 +153,7 @@ function ProfilePage() {
           </Button>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
