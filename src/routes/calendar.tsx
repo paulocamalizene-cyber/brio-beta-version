@@ -695,9 +695,18 @@ function CalendarApp() {
   const isTodaySel = isSameDay(selected, now);
 
   return (
-    <main className="flex h-screen flex-col bg-background text-foreground">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 pb-1 pt-3">
+    <main className="flex h-screen flex-col bg-background text-foreground md:flex-row">
+      {/* Desktop sidebar with month calendar */}
+      <MonthSidebar
+        selected={selected}
+        now={now}
+        onSelect={setSelected}
+        events={events}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+      {/* Top bar (mobile) */}
+      <header className="flex items-center justify-between px-4 pb-1 pt-3 md:hidden">
         <button
           onClick={() => setSelected((d) => addDays(d, -1))}
           className="flex items-center gap-0.5 text-[17px] font-normal text-primary"
