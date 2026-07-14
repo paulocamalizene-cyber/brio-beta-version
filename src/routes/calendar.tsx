@@ -777,17 +777,17 @@ function CalendarApp() {
       </div>
 
       {/* Day label bar */}
-      <div className="border-y border-border bg-secondary/60 px-4 py-1.5">
-        <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="border-y border-border bg-secondary/60 px-4 py-1.5 md:border-t-0 md:bg-transparent md:px-6 md:py-4">
+        <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground md:text-[11px]">
           {isTodaySel ? "Hoje" : format(selected, "EEEE", { locale: ptBR })}
           <span className="ml-2 font-normal capitalize text-muted-foreground/70">
-            {format(selected, "d 'de' MMMM", { locale: ptBR })}
+            {format(selected, "d 'de' MMMM yyyy", { locale: ptBR })}
           </span>
         </p>
       </div>
 
       {/* Agenda timeline */}
-      <div className="relative flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))]">
+      <div className="relative flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
         <div
           ref={gridRef}
           className="h-full overflow-y-auto scroll-smooth"
