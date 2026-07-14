@@ -3,10 +3,17 @@ import { BottomNav } from "@/components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
+  addMonths,
   differenceInCalendarDays,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
   format,
   isSameDay,
+  isSameMonth,
   parseISO,
+  startOfMonth,
+  startOfWeek,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -688,9 +695,18 @@ function CalendarApp() {
   const isTodaySel = isSameDay(selected, now);
 
   return (
-    <main className="flex h-screen flex-col bg-background text-foreground">
-      {/* Top bar */}
-      <header className="flex items-center justify-between px-4 pb-1 pt-3">
+    <main className="flex h-screen flex-col bg-background text-foreground md:flex-row">
+      {/* Desktop sidebar with month calendar */}
+      <MonthSidebar
+        selected={selected}
+        now={now}
+        onSelect={setSelected}
+        events={events}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+      {/* Top bar (mobile) */}
+      <header className="flex items-center justify-between px-4 pb-1 pt-3 md:hidden">
         <button
           onClick={() => setSelected((d) => addDays(d, -1))}
           className="flex items-center gap-0.5 text-[17px] font-normal text-primary"
@@ -721,7 +737,7 @@ function CalendarApp() {
       </header>
 
       {/* Week strip */}
-      <div className="px-2 pb-2 pt-1">
+      <div className="px-2 pb-2 pt-1 md:hidden">
         <div className="grid grid-cols-7">
           {stripDays.map((d) => {
             const isSel = isSameDay(d, selected);
@@ -761,17 +777,17 @@ function CalendarApp() {
       </div>
 
       {/* Day label bar */}
-      <div className="border-y border-border bg-secondary/60 px-4 py-1.5">
-        <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="border-y border-border bg-secondary/60 px-4 py-1.5 md:border-t-0 md:bg-transparent md:px-6 md:py-4">
+        <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground md:text-[11px]">
           {isTodaySel ? "Hoje" : format(selected, "EEEE", { locale: ptBR })}
           <span className="ml-2 font-normal capitalize text-muted-foreground/70">
-            {format(selected, "d 'de' MMMM", { locale: ptBR })}
+            {format(selected, "d 'de' MMMM yyyy", { locale: ptBR })}
           </span>
         </p>
       </div>
 
       {/* Agenda timeline */}
-      <div className="relative flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))]">
+      <div className="relative flex-1 overflow-hidden pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
         <div
           ref={gridRef}
           className="h-full overflow-y-auto scroll-smooth"
@@ -860,7 +876,7 @@ function CalendarApp() {
       </div>
 
       {/* Bottom bar */}
-      <nav className="flex items-center justify-between border-t border-border bg-secondary/60 px-6 py-2 text-primary">
+      <nav className="flex items-center justify-between border-t border-border bg-secondary/60 px-6 py-2 text-primary md:hidden">
         <button
           onClick={() => setSelected(new Date())}
           className="text-[15px] font-semibold"
@@ -888,6 +904,8 @@ function CalendarApp() {
           Estatísticas
         </button>
       </nav>
+      </div>
+
 
       {/* Scope picker for recurring */}
       <AlertDialog
@@ -1318,7 +1336,9 @@ function CalendarApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <BottomNav />
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
     </main>
   );
 }
@@ -1660,5 +1680,136 @@ function StatCard({
         {value}
       </p>
     </div>
+  );
+}
+
+// ───────────────────────── MonthSidebar ─────────────────────────
+
+function MonthSidebar({
+  selected,
+  now,
+  onSelect,
+  events,
+}: {
+  selected: Date;
+  now: Date;
+  onSelect: (d: Date) => void;
+  events: EventDef[];
+}) {
+  const [cursor, setCursor] = useState<Date>(startOfMonth(selected));
+
+  useEffect(() => {
+    setCursor(startOfMonth(selected));
+  }, [selected]);
+
+  const days = useMemo(() => {
+    const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [cursor]);
+
+  const weekdayLabels = useMemo(() => {
+    const base = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) =>
+      format(addDays(base, i), "EEEEE", { locale: ptBR }).toUpperCase(),
+    );
+  }, []);
+
+  const hasEvent = (d: Date) => {
+    const key = fmtKey(d);
+    return events.some((ev) => occursOn(ev, key));
+  };
+
+  return (
+    <aside className="hidden shrink-0 flex-col border-r border-border bg-secondary/40 md:flex md:w-[300px] lg:w-[340px]">
+      <div className="px-6 pb-4 pt-6">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Agenda
+        </p>
+        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+          {format(now, "EEEE, d 'de' MMM", { locale: ptBR })}
+        </h1>
+      </div>
+
+      <div className="flex items-center justify-between px-6 pb-3">
+        <button
+          onClick={() => setCursor((c) => addMonths(c, -1))}
+          className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Mês anterior"
+        >
+          <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
+        </button>
+        <button
+          onClick={() => setCursor(startOfMonth(now))}
+          className="font-display text-base font-semibold capitalize"
+        >
+          {format(cursor, "MMMM yyyy", { locale: ptBR })}
+        </button>
+        <button
+          onClick={() => setCursor((c) => addMonths(c, 1))}
+          className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Próximo mês"
+        >
+          <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 px-4 pb-1">
+        {weekdayLabels.map((w, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-center py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            {w}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-1 px-4 pb-4">
+        {days.map((d) => {
+          const inMonth = isSameMonth(d, cursor);
+          const isSel = isSameDay(d, selected);
+          const isToday = isSameDay(d, now);
+          const marker = hasEvent(d);
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onSelect(d)}
+              className="flex flex-col items-center py-0.5"
+            >
+              <span
+                className={[
+                  "flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-medium tabular-nums transition-colors",
+                  isSel
+                    ? "bg-primary text-primary-foreground"
+                    : isToday
+                      ? "text-primary"
+                      : inMonth
+                        ? "text-foreground hover:bg-secondary"
+                        : "text-muted-foreground/50 hover:bg-secondary",
+                ].join(" ")}
+              >
+                {format(d, "d")}
+              </span>
+              <span
+                className={[
+                  "mt-0.5 h-1 w-1 rounded-full",
+                  marker && !isSel ? "bg-primary" : "bg-transparent",
+                ].join(" ")}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-auto border-t border-border px-6 py-4">
+        <button
+          onClick={() => onSelect(new Date())}
+          className="text-sm font-semibold text-primary"
+        >
+          Ir para hoje
+        </button>
+      </div>
+    </aside>
   );
 }
