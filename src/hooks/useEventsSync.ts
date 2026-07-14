@@ -83,20 +83,19 @@ function minToTime(m?: number): string | null {
 }
 
 function serialize(e: LocalEvent) {
-  // Stable string so we skip re-syncing unchanged events
   return JSON.stringify({
     t: e.title,
-    d: e.description ?? "",
+    d: e.notes ?? "",
     l: e.location ?? null,
     c: e.color ?? "",
     dt: e.date,
-    s: e.startMin ?? null,
-    en: e.endMin ?? null,
-    r: e.rrule ?? "",
-    rm: e.reminders ?? null,
-    a: e.attendees ?? null,
+    s: e.start ?? null,
+    en: e.end ?? null,
+    r: e.recurrence ?? null,
+    n: e.notifications ?? null,
   });
 }
+
 
 export function useAuthedUserId() {
   const [userId, setUserId] = useState<string | null>(null);
