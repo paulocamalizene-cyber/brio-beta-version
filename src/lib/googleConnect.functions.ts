@@ -76,3 +76,11 @@ export const getGoogleCalendarStatus = createServerFn({ method: "GET" })
     const connected = await hasConnection(context.userId, CONNECTOR_ID);
     return { connected, clientConfigured };
   });
+
+export const pullGoogleCalendar = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { pullFromGoogle } = await import("./googleCalendar.server");
+    return pullFromGoogle(context.userId);
+  });
+
