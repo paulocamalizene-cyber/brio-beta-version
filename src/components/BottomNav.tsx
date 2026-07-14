@@ -11,8 +11,8 @@ const items = [
 export function BottomNav() {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="glass-strong fixed inset-x-0 bottom-0 z-50"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)", borderTop: "1px solid var(--glass-border)" }}
       aria-label="Navegação principal"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 py-1.5">
@@ -21,8 +21,8 @@ export function BottomNav() {
             <Link
               to={to}
               activeOptions={{ exact: true }}
-              className="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors active:bg-accent/40"
-              activeProps={{ className: "text-primary" }}
+              className="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors"
+              activeProps={{ className: "text-primary bg-white/25 dark:bg-white/10" }}
             >
               <Icon className="h-6 w-6" strokeWidth={2} />
               <span>{label}</span>

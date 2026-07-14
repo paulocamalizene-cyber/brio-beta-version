@@ -666,12 +666,12 @@ function MapPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Pesquisar endereço ou local"
-            className="h-11 rounded-full border-0 bg-background/95 px-5 shadow-lg ring-1 ring-border backdrop-blur"
+            className="h-11 rounded-full glass border-0 px-5"
           />
         </form>
         <div className="pointer-events-auto flex items-center gap-2">
           <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <SelectTrigger className="h-9 w-[110px] rounded-full border-0 bg-background/95 text-xs shadow-lg ring-1 ring-border backdrop-blur">
+            <SelectTrigger className="h-9 w-[110px] rounded-full glass border-0 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -682,7 +682,7 @@ function MapPage() {
             </SelectContent>
           </Select>
           <Select value={colorFilter} onValueChange={setColorFilter}>
-            <SelectTrigger className="h-9 w-[140px] rounded-full border-0 bg-background/95 text-xs shadow-lg ring-1 ring-border backdrop-blur">
+            <SelectTrigger className="h-9 w-[140px] rounded-full glass border-0 text-xs">
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
@@ -697,7 +697,7 @@ function MapPage() {
               ))}
             </SelectContent>
           </Select>
-          <span className="ml-auto rounded-full bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-lg ring-1 ring-border backdrop-blur">
+          <span className="ml-auto rounded-full glass px-3 py-1 text-xs text-muted-foreground">
             {filteredEvents.length} evento{filteredEvents.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -707,7 +707,7 @@ function MapPage() {
 
         {/* Angle overlay while rotating */}
         {compassDragging && (
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/90 px-4 py-2 text-sm font-semibold shadow-lg ring-1 ring-border">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full glass-strong px-4 py-2 text-sm font-semibold">
             {Math.round(heading)}°
           </div>
         )}
@@ -726,7 +726,7 @@ function MapPage() {
               onPointerMove={onCompassPointerMove}
               onPointerUp={onCompassPointerUp}
               onPointerCancel={onCompassPointerUp}
-              className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-full glass shadow-none ring-0 transition hover:bg-accent active:scale-95 touch-none ${compassDragging ? "cursor-grabbing" : "cursor-grab"}`}
               style={{ cursor: compassDragging ? "grabbing" : "grab" }}
               aria-label="Bússola: voltar ao norte"
               title="Clique: voltar ao norte · Arraste: rotacionar"
@@ -746,13 +746,13 @@ function MapPage() {
           <div className="relative">
             <button
               onClick={() => setShowLayers((v) => !v)}
-              className={`flex h-11 w-11 items-center justify-center rounded-full bg-background/95 shadow-lg ring-1 ring-border transition hover:bg-accent active:scale-95 ${showLayers ? "bg-accent" : ""}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-full glass shadow-none ring-0 transition hover:bg-accent active:scale-95 ${showLayers ? "bg-accent" : ""}`}
               aria-label="Camadas"
             >
               <Layers className="h-5 w-5 text-foreground" />
             </button>
             {showLayers && (
-              <div className="absolute right-0 top-12 w-48 rounded-2xl border border-border bg-background/98 p-1.5 shadow-xl backdrop-blur">
+              <div className="absolute right-0 top-12 w-48 rounded-2xl border border-border glass-strong p-1.5">
                 {([
                   { v: "roadmap", label: "🗺️ Padrão" },
                   { v: "satellite", label: "🛰️ Satélite" },
@@ -779,7 +779,7 @@ function MapPage() {
           </div>
 
           {/* Zoom controls — circular, fully visible */}
-          <div className="flex flex-col overflow-hidden rounded-full bg-background/95 shadow-lg ring-1 ring-border">
+          <div className="flex flex-col overflow-hidden rounded-full glass shadow-none ring-0">
             <button
               onClick={() => zoomBy(1)}
               className="flex h-11 w-11 items-center justify-center transition hover:bg-accent active:scale-95"
@@ -801,7 +801,7 @@ function MapPage() {
         {/* Locate me — one-shot recenter. It never locks/follows the camera. */}
         <button
           onClick={locateMe}
-          className={`absolute right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          className={`absolute right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "glass text-foreground hover:bg-white/40 dark:hover:bg-white/10"}`}
           style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
           aria-label="Minha localização"
           aria-pressed={locating}
@@ -813,7 +813,7 @@ function MapPage() {
         {/* Selected event card */}
         {selected && (
           <div
-            className="absolute left-3 right-3 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur"
+            className="absolute left-3 right-3 z-10 rounded-2xl glass-strong p-4"
             style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
           >
             <div className="flex items-start gap-3">
