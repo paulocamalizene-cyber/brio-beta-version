@@ -161,7 +161,7 @@ async function syncEventToGoogleInternal(userId: string, eventId: string) {
         .eq("id", eventId);
       return;
     }
-    const result = row.google_event_id ? await pushUpdate(userId, row) : await pushCreate(userId, row);
+    const result = row.google_event_id ? await pushUpdate(userId, eventForGoogle) : await pushCreate(userId, eventForGoogle);
     if (result.ok) {
       await supabaseAdmin
         .from("events")
