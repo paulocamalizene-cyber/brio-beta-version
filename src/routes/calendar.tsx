@@ -1336,7 +1336,9 @@ function CalendarApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <BottomNav />
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
     </main>
   );
 }
