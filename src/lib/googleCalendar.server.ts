@@ -210,3 +210,191 @@ export async function pushDelete(
   }
   return { ok: true };
 }
+
+export interface PullResult {
+  imported: number;
+  updated: number;
+  deleted: number;
+  errors: string[];
+}
+
+/**
+ * Manual pull: fetches events from the user's primary Google Calendar and
+ * upserts them into public.events. Uses syncToken for incremental sync when
+ * available; falls back to a time-bounded window on first run or when the
+ * token expires.
+ */
+export async function pullFromGoogle(userId: string): Promise<PullResult> {
+  const result: PullResult = { imported: 0, updated: 0, deleted: 0, errors: [] };
+  const connectionAPIKey = await getConnectionKeyOrNull(userId);
+  if (!connectionAPIKey) {
+    result.errors.push("Não conectado ao Google Calendar");
+    return result;
+  }
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // Load stored syncToken
+  const { data: conn } = await supabaseAdmin
+    .from("app_user_connections")
+    .select("google_sync_token")
+    .eq("user_id", userId)
+    .eq("connector_id", GOOGLE_CALENDAR_CONNECTOR_ID)
+    .maybeSingle();
+
+  let syncToken: string | null = conn?.google_sync_token ?? null;
+  let pageToken: string | null = null;
+  let nextSyncToken: string | null = null;
+
+  const timeMin = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString();
+  })();
+  const timeMax = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 365);
+    return d.toISOString();
+  })();
+
+  let tokenReset = false;
+  for (let i = 0; i < 20; i++) {
+    const params = new URLSearchParams();
+    params.set("singleEvents", "true");
+    params.set("maxResults", "250");
+    if (syncToken && !tokenReset) {
+      params.set("syncToken", syncToken);
+    } else {
+      params.set("timeMin", timeMin);
+      params.set("timeMax", timeMax);
+    }
+    if (pageToken) params.set("pageToken", pageToken);
+
+    const res = await callAsAppUser({
+      gatewayBaseUrl: GATEWAY_BASE_URL,
+      connectionAPIKey,
+      connectorId: GOOGLE_CALENDAR_CONNECTOR_ID,
+      path: `/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events?${params.toString()}`,
+    });
+
+    if (res.status === 410 && syncToken && !tokenReset) {
+      // syncToken expired — restart with full window
+      tokenReset = true;
+      syncToken = null;
+      pageToken = null;
+      continue;
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      result.errors.push(`Google API ${res.status}: ${text.slice(0, 200)}`);
+      break;
+    }
+    const body = (await res.json()) as {
+      items?: Array<{
+        id: string;
+        status?: string;
+        summary?: string;
+        description?: string;
+        location?: string;
+        start?: { date?: string; dateTime?: string };
+        end?: { date?: string; dateTime?: string };
+        recurrence?: string[];
+        etag?: string;
+        updated?: string;
+        reminders?: {
+          useDefault?: boolean;
+          overrides?: Array<{ method: string; minutes: number }>;
+        };
+        attendees?: Array<{ email: string; displayName?: string }>;
+      }>;
+      nextPageToken?: string;
+      nextSyncToken?: string;
+    };
+
+    for (const item of body.items ?? []) {
+      try {
+        if (item.status === "cancelled") {
+          const { error, count } = await supabaseAdmin
+            .from("events")
+            .delete({ count: "exact" })
+            .eq("user_id", userId)
+            .eq("google_event_id", item.id);
+          if (error) throw error;
+          if (count) result.deleted += count;
+          continue;
+        }
+
+        // Check for existing local row + conflict resolution
+        const { data: existing } = await supabaseAdmin
+          .from("events")
+          .select("id, updated_at")
+          .eq("user_id", userId)
+          .eq("google_event_id", item.id)
+          .maybeSingle();
+
+        const googleUpdated = item.updated ? new Date(item.updated).getTime() : 0;
+        const localUpdated = existing?.updated_at ? new Date(existing.updated_at).getTime() : 0;
+
+        if (existing && localUpdated > googleUpdated) {
+          // local is newer — skip
+          continue;
+        }
+
+        const isAllDay = !!item.start?.date;
+        const start_date =
+          item.start?.date ??
+          (item.start?.dateTime ? item.start.dateTime.slice(0, 10) : null);
+        if (!start_date) continue;
+
+        const timeFrom = (iso?: string) => (iso ? iso.slice(11, 16) : null);
+        const row = {
+          user_id: userId,
+          title: item.summary ?? "(sem título)",
+          description: item.description ?? null,
+          location: item.location ? { address: item.location } : null,
+          color: null,
+          start_date,
+          start_time: isAllDay ? null : timeFrom(item.start?.dateTime),
+          end_time: isAllDay ? null : timeFrom(item.end?.dateTime),
+          recurrence: item.recurrence?.[0]?.replace(/^RRULE:/, "") ?? null,
+          reminders: item.reminders ?? null,
+          attendees: item.attendees ?? null,
+          google_event_id: item.id,
+          google_calendar_id: CALENDAR_ID,
+          google_etag: item.etag ?? null,
+          sync_status: "synced" as const,
+          sync_error: null,
+          last_synced_at: new Date().toISOString(),
+        };
+
+        if (existing) {
+          const { error } = await supabaseAdmin
+            .from("events")
+            .update(row)
+            .eq("id", existing.id);
+          if (error) throw error;
+          result.updated++;
+        } else {
+          const { error } = await supabaseAdmin.from("events").insert(row);
+          if (error) throw error;
+          result.imported++;
+        }
+      } catch (e) {
+        result.errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    pageToken = body.nextPageToken ?? null;
+    nextSyncToken = body.nextSyncToken ?? nextSyncToken;
+    if (!pageToken) break;
+  }
+
+  if (nextSyncToken) {
+    await supabaseAdmin
+      .from("app_user_connections")
+      .update({ google_sync_token: nextSyncToken, last_full_sync_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("connector_id", GOOGLE_CALENDAR_CONNECTOR_ID);
+  }
+
+  return result;
+}
