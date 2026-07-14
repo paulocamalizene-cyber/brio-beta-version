@@ -153,6 +153,7 @@ async function syncEventToGoogleInternal(userId: string, eventId: string) {
     if (error || !row) return;
 
     const { pushCreate, pushUpdate, isGoogleConnected } = await import("./googleCalendar.server");
+    const eventForGoogle = row as unknown as import("./googleCalendar.server").AppEventRow;
     if (!(await isGoogleConnected(userId))) {
       await supabaseAdmin
         .from("events")
