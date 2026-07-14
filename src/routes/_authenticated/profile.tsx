@@ -102,11 +102,14 @@ function ProfilePage() {
   async function handleSync() {
     setSyncing(true);
     try {
-      const r = await syncPending();
+      const [pushRes, pullRes] = await Promise.all([syncPending(), pullFromGoogle()]);
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      toast.success(`Sincronização concluída`, {
-        description: `${r.processed} evento(s) processado(s).`,
-      });
+      const desc = `${pushRes.processed} enviado(s), ${pullRes.imported} importado(s), ${pullRes.updated} atualizado(s), ${pullRes.deleted} removido(s).`;
+      if (pullRes.errors.length) {
+        toast.warning("Sincronização parcial", { description: `${desc} Erros: ${pullRes.errors[0]}` });
+      } else {
+        toast.success("Sincronização concluída", { description: desc });
+      }
     } catch (e) {
       toast.error("Erro na sincronização", { description: e instanceof Error ? e.message : String(e) });
     } finally {
