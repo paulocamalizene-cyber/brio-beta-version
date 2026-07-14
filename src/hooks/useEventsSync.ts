@@ -11,23 +11,67 @@ export interface SyncInfo {
 }
 
 // Shape produced by src/routes/_authenticated/calendar.tsx (kept loose to avoid import cycles)
+interface Recurrence {
+  freq: string;
+  byWeekday?: number[];
+  interval?: number;
+  unit?: "day" | "week" | "month";
+  until?: string | null;
+  count?: number | null;
+}
 interface LocalEvent {
   id: string;
   title: string;
-  description?: string;
-  location?: { address?: string; lat?: number; lng?: number; name?: string };
+  notes?: string;
+  location?: { address?: string; lat?: number; lng?: number };
   color?: string;
   date: string; // yyyy-mm-dd (occurrence base date)
-  startMin?: number;
-  endMin?: number;
-  rrule?: string;
-  reminders?: {
-    useDefault?: boolean;
-    overrides?: Array<{ method: "email" | "popup"; minutes: number }>;
-  };
-  attendees?: Array<{ email: string; displayName?: string }>;
-  statusMap?: Record<string, string>;
+  start?: number; // minutes
+  end?: number; // minutes
+  recurrence?: Recurrence;
+  notifications?: number[];
+  statuses?: Record<string, string>;
 }
+
+function recurrenceToRRule(r?: Recurrence): string | null {
+  if (!r || r.freq === "none") return null;
+  const parts: string[] = [];
+  const untilPart = r.until ? `;UNTIL=${r.until.replace(/-/g, "")}T235959Z` : "";
+  const countPart = r.count ? `;COUNT=${r.count}` : "";
+  switch (r.freq) {
+    case "daily":
+      parts.push("FREQ=DAILY");
+      break;
+    case "weekdays":
+      parts.push("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
+      break;
+    case "weekly":
+      parts.push("FREQ=WEEKLY");
+      break;
+    case "biweekly":
+      parts.push("FREQ=WEEKLY;INTERVAL=2");
+      break;
+    case "monthly":
+      parts.push("FREQ=MONTHLY");
+      break;
+    case "yearly":
+      parts.push("FREQ=YEARLY");
+      break;
+    case "custom": {
+      const days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+      const unit = r.unit === "day" ? "DAILY" : r.unit === "month" ? "MONTHLY" : "WEEKLY";
+      parts.push(`FREQ=${unit};INTERVAL=${r.interval ?? 1}`);
+      if (r.byWeekday && r.byWeekday.length) {
+        parts.push(`BYDAY=${r.byWeekday.map((d) => days[d]).join(",")}`);
+      }
+      break;
+    }
+    default:
+      return null;
+  }
+  return parts.join(";") + untilPart + countPart;
+}
+
 
 function minToTime(m?: number): string | null {
   if (m == null) return null;
