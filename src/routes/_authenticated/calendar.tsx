@@ -1823,3 +1823,40 @@ function MonthSidebar({
     </aside>
   );
 }
+
+// ───────────────────────── SyncBadge ─────────────────────────
+function SyncBadge({ info, color }: { info: SyncInfo | null | undefined; color: string }) {
+  if (!info) return null;
+  const commonCls = "h-3 w-3 shrink-0";
+  const title = (() => {
+    switch (info.status) {
+      case "synced":
+        return "Sincronizado com o Google Calendar";
+      case "pending":
+        return "Sincronização pendente";
+      case "error":
+        return info.error ? `Erro: ${info.error.slice(0, 120)}` : "Erro na sincronização";
+      case "local":
+      default:
+        return "Somente local (Google Calendar não conectado)";
+    }
+  })();
+  const icon = (() => {
+    switch (info.status) {
+      case "synced":
+        return <CheckCircle2 className={commonCls} style={{ color }} />;
+      case "pending":
+        return <Loader2 className={`${commonCls} animate-spin opacity-70`} style={{ color }} />;
+      case "error":
+        return <AlertTriangle className={commonCls} style={{ color: "#dc2626" }} />;
+      case "local":
+      default:
+        return <CloudOff className={`${commonCls} opacity-60`} style={{ color }} />;
+    }
+  })();
+  return (
+    <span title={title} aria-label={title}>
+      {icon}
+    </span>
+  );
+}
