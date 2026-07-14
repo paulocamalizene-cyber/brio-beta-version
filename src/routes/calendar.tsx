@@ -904,6 +904,8 @@ function CalendarApp() {
           Estatísticas
         </button>
       </nav>
+      </div>
+
 
       {/* Scope picker for recurring */}
       <AlertDialog
