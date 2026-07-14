@@ -712,8 +712,8 @@ function MapPage() {
 
         {/* Right-side controls stack */}
         <div
-          className="absolute right-3 top-3 z-10 flex flex-col gap-2"
-          style={{ top: "calc(0.75rem)" }}
+          className="absolute right-3 z-10 flex flex-col gap-2"
+          style={{ top: "calc(6.5rem + env(safe-area-inset-top))" }}
         >
           {(Math.abs(heading) > 0.5 || Math.abs(heading - 360) < 0.5 || compassDragging) && (
             <button
