@@ -633,81 +633,73 @@ function MapPage() {
   }
 
   return (
-    <main
-      className="fixed inset-0 z-0 flex flex-col overflow-hidden bg-background text-foreground"
-      style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}
-    >
+    <main className="fixed inset-0 z-0 overflow-hidden bg-background text-foreground">
+      {/* Fullscreen map canvas — no borders, no rounded corners, no padding. */}
+      <div
+        ref={containerRef}
+        className="absolute inset-0 outline-none"
+        style={{ touchAction: "none", contain: "strict", background: "#aadaff" }}
+      />
 
-      {/* Compact top bar: title + search only. Layers moved into the map. */}
-      <header
-        className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur"
+      {error && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
+          {error}
+        </div>
+      )}
+      {!ready && !error && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center text-sm text-muted-foreground">
+          Carregando mapa…
+        </div>
+      )}
+
+      {/* Floating search + filter pills — overlay only, no full-width bars. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 px-3"
         style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
       >
-        <div className="flex h-9 items-center px-1 font-display text-base font-semibold">
-          Mapa
-        </div>
-        <form onSubmit={runSearch} className="flex-1">
+        <form onSubmit={runSearch} className="pointer-events-auto">
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Pesquisar endereço ou local"
-            className="h-9"
+            className="h-11 rounded-full border-0 bg-background/95 px-5 shadow-lg ring-1 ring-border backdrop-blur"
           />
         </form>
-      </header>
-
-      {/* Filters */}
-      <div className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2">
-        <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <SelectTrigger className="h-8 w-[110px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="day">Hoje</SelectItem>
-            <SelectItem value="week">Semana</SelectItem>
-            <SelectItem value="month">Mês</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={colorFilter} onValueChange={setColorFilter}>
-          <SelectTrigger className="h-8 w-[140px] text-xs">
-            <SelectValue placeholder="Categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as cores</SelectItem>
-            {availableColors.map((c) => (
-              <SelectItem key={c} value={c}>
-                <span className="inline-flex items-center gap-2">
-                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} />
-                  {c}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {filteredEvents.length} evento{filteredEvents.length === 1 ? "" : "s"}
-        </span>
+        <div className="pointer-events-auto flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <SelectTrigger className="h-9 w-[110px] rounded-full border-0 bg-background/95 text-xs shadow-lg ring-1 ring-border backdrop-blur">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="day">Hoje</SelectItem>
+              <SelectItem value="week">Semana</SelectItem>
+              <SelectItem value="month">Mês</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={colorFilter} onValueChange={setColorFilter}>
+            <SelectTrigger className="h-9 w-[140px] rounded-full border-0 bg-background/95 text-xs shadow-lg ring-1 ring-border backdrop-blur">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as cores</SelectItem>
+              {availableColors.map((c) => (
+                <SelectItem key={c} value={c}>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} />
+                    {c}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="ml-auto rounded-full bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-lg ring-1 ring-border backdrop-blur">
+            {filteredEvents.length} evento{filteredEvents.length === 1 ? "" : "s"}
+          </span>
+        </div>
       </div>
+      <div className="contents">
 
-      {/* Map */}
-      <div className="relative flex-1 overflow-hidden">
-        <div
-          ref={containerRef}
-          className="absolute inset-0 overscroll-contain"
-          style={{ touchAction: "none", contain: "strict" }}
-        />
-
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 px-6 text-center text-sm text-muted-foreground">
-            {error}
-          </div>
-        )}
-        {!ready && !error && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            Carregando mapa…
-          </div>
-        )}
 
         {/* Angle overlay while rotating */}
         {compassDragging && (
@@ -720,8 +712,8 @@ function MapPage() {
 
         {/* Right-side controls stack */}
         <div
-          className="absolute right-3 top-3 z-10 flex flex-col gap-2"
-          style={{ top: "calc(0.75rem)" }}
+          className="absolute right-3 z-10 flex flex-col gap-2"
+          style={{ top: "calc(6.5rem + env(safe-area-inset-top))" }}
         >
           {(Math.abs(heading) > 0.5 || Math.abs(heading - 360) < 0.5 || compassDragging) && (
             <button
@@ -805,7 +797,8 @@ function MapPage() {
         {/* Locate me — one-shot recenter. It never locks/follows the camera. */}
         <button
           onClick={locateMe}
-          className={`absolute right-3 bottom-4 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          className={`absolute right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-lg ring-1 ring-border transition active:scale-95 ${locating ? "bg-primary text-primary-foreground" : "bg-background/95 text-foreground hover:bg-accent"}`}
+          style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
           aria-label="Minha localização"
           aria-pressed={locating}
         >
@@ -815,7 +808,10 @@ function MapPage() {
 
         {/* Selected event card */}
         {selected && (
-          <div className="absolute left-3 right-3 bottom-4 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur">
+          <div
+            className="absolute left-3 right-3 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-xl backdrop-blur"
+            style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
+          >
             <div className="flex items-start gap-3">
               <span className="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-full" style={{ background: selected.color }} />
               <div className="min-w-0 flex-1">
