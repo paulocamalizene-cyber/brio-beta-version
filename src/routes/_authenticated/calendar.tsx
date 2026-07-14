@@ -1397,6 +1397,7 @@ function EventCard(props: {
   onResizePointerDown: (e: React.PointerEvent, o: Occurrence) => void;
   onOpenEdit: () => void;
   onSetStatus: (s: Status | null) => void;
+  syncInfo?: SyncInfo | null;
 }) {
   const {
     o,
@@ -1413,6 +1414,7 @@ function EventCard(props: {
     onResizePointerDown,
     onOpenEdit,
     onSetStatus,
+    syncInfo,
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const text = readableText(color);
