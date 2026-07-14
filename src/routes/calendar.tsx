@@ -1682,3 +1682,134 @@ function StatCard({
     </div>
   );
 }
+
+// ───────────────────────── MonthSidebar ─────────────────────────
+
+function MonthSidebar({
+  selected,
+  now,
+  onSelect,
+  events,
+}: {
+  selected: Date;
+  now: Date;
+  onSelect: (d: Date) => void;
+  events: EventDef[];
+}) {
+  const [cursor, setCursor] = useState<Date>(startOfMonth(selected));
+
+  useEffect(() => {
+    setCursor(startOfMonth(selected));
+  }, [selected]);
+
+  const days = useMemo(() => {
+    const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [cursor]);
+
+  const weekdayLabels = useMemo(() => {
+    const base = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) =>
+      format(addDays(base, i), "EEEEE", { locale: ptBR }).toUpperCase(),
+    );
+  }, []);
+
+  const hasEvent = (d: Date) => {
+    const key = fmtKey(d);
+    return events.some((ev) => occursOn(ev, key));
+  };
+
+  return (
+    <aside className="hidden shrink-0 flex-col border-r border-border bg-secondary/40 md:flex md:w-[300px] lg:w-[340px]">
+      <div className="px-6 pb-4 pt-6">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Agenda
+        </p>
+        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+          {format(now, "EEEE, d 'de' MMM", { locale: ptBR })}
+        </h1>
+      </div>
+
+      <div className="flex items-center justify-between px-6 pb-3">
+        <button
+          onClick={() => setCursor((c) => addMonths(c, -1))}
+          className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Mês anterior"
+        >
+          <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
+        </button>
+        <button
+          onClick={() => setCursor(startOfMonth(now))}
+          className="font-display text-base font-semibold capitalize"
+        >
+          {format(cursor, "MMMM yyyy", { locale: ptBR })}
+        </button>
+        <button
+          onClick={() => setCursor((c) => addMonths(c, 1))}
+          className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Próximo mês"
+        >
+          <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 px-4 pb-1">
+        {weekdayLabels.map((w, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-center py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            {w}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-1 px-4 pb-4">
+        {days.map((d) => {
+          const inMonth = isSameMonth(d, cursor);
+          const isSel = isSameDay(d, selected);
+          const isToday = isSameDay(d, now);
+          const marker = hasEvent(d);
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onSelect(d)}
+              className="flex flex-col items-center py-0.5"
+            >
+              <span
+                className={[
+                  "flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-medium tabular-nums transition-colors",
+                  isSel
+                    ? "bg-primary text-primary-foreground"
+                    : isToday
+                      ? "text-primary"
+                      : inMonth
+                        ? "text-foreground hover:bg-secondary"
+                        : "text-muted-foreground/50 hover:bg-secondary",
+                ].join(" ")}
+              >
+                {format(d, "d")}
+              </span>
+              <span
+                className={[
+                  "mt-0.5 h-1 w-1 rounded-full",
+                  marker && !isSel ? "bg-primary" : "bg-transparent",
+                ].join(" ")}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-auto border-t border-border px-6 py-4">
+        <button
+          onClick={() => onSelect(new Date())}
+          className="text-sm font-semibold text-primary"
+        >
+          Ir para hoje
+        </button>
+      </div>
+    </aside>
+  );
+}
