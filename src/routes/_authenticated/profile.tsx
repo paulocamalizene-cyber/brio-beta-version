@@ -37,6 +37,7 @@ function ProfilePage() {
   const saveConnection = useServerFn(saveGoogleCalendarConnection);
   const disconnect = useServerFn(disconnectGoogleCalendar);
   const syncPending = useServerFn(syncAllPending);
+  const pullFromGoogle = useServerFn(pullGoogleCalendar);
   const [email, setEmail] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
