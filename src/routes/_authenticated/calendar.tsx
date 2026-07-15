@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { BottomNav } from "@/components/BottomNav";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEventsSync, type SyncInfo } from "@/hooks/useEventsSync";
 import {
