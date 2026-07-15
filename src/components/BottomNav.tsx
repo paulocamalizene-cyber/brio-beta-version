@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Home, Calendar, Map, User } from "lucide-react";
+import { Home, Calendar, Map, Settings } from "lucide-react";
 
 const items = [
   { to: "/", label: "Home", Icon: Home },
   { to: "/calendar", label: "Calendário", Icon: Calendar },
   { to: "/map", label: "Mapa", Icon: Map },
-  { to: "/profile", label: "Perfil", Icon: User },
+  { to: "/profile", label: "Definições", Icon: Settings },
 ] as const;
 
 export function BottomNav() {
