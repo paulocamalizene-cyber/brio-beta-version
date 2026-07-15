@@ -4,6 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { connectAppUser } from "@/integrations/lovable/appUserConnectorClient";
 import {
@@ -15,15 +17,31 @@ import {
 } from "@/lib/googleConnect.functions";
 import { syncAllPending } from "@/lib/events.functions";
 import { toast } from "sonner";
-import { CheckCircle2, LogOut, RefreshCw, XCircle, Loader2, AlertTriangle } from "lucide-react";
+import {
+  User as UserIcon,
+  Lock,
+  Bell,
+  Moon,
+  Info,
+  HelpCircle,
+  Trash2,
+  ChevronRight,
+  LogOut,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 const GATEWAY_BASE_URL = "https://connector-gateway.lovable.dev";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
-      { title: "Perfil | Brio" },
-      { name: "description", content: "Sua conta e integrações do Brio." },
+      { title: "Definições | Brio" },
+      { name: "description", content: "Sua conta, preferências e integrações do Brio." },
     ],
   }),
   component: ProfilePage,
@@ -38,10 +56,14 @@ function ProfilePage() {
   const disconnect = useServerFn(disconnectGoogleCalendar);
   const syncPending = useServerFn(syncAllPending);
   const pullFromGoogle = useServerFn(pullGoogleCalendar);
+
   const [email, setEmail] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [notifications, setNotifications] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
 
   const statusQuery = useQuery({
     queryKey: ["gcal-status"],
@@ -57,8 +79,28 @@ function ProfilePage() {
           data.user?.email?.split("@")[0] ??
           null,
       );
+      setAvatarUrl(
+        (data.user?.user_metadata?.avatar_url as string | undefined) ??
+          (data.user?.user_metadata?.picture as string | undefined) ??
+          null,
+      );
     });
   }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const prefersDark =
+      stored === "dark" ||
+      (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    setDarkMode(prefersDark);
+    document.documentElement.classList.toggle("dark", prefersDark);
+  }, []);
+
+  function toggleDarkMode(value: boolean) {
+    setDarkMode(value);
+    document.documentElement.classList.toggle("dark", value);
+    localStorage.setItem("theme", value ? "dark" : "light");
+  }
 
   async function handleConnect() {
     setConnecting(true);
@@ -73,13 +115,12 @@ function ProfilePage() {
         return;
       }
       if (!result.connectionAPIKey) {
-        toast.warning("Conta conectada, mas sem acesso offline. Sincronização não estará disponível.");
+        toast.warning("Conta conectada, mas sem acesso offline.");
         return;
       }
       await saveConnection({ data: { connectionAPIKey: result.connectionAPIKey } });
       toast.success("Google Calendar conectado");
       queryClient.invalidateQueries({ queryKey: ["gcal-status"] });
-      // Sync any pending local events
       await syncPending();
       queryClient.invalidateQueries({ queryKey: ["events"] });
     } catch (e) {
@@ -127,102 +168,236 @@ function ProfilePage() {
   const connected = statusQuery.data?.connected ?? false;
   const clientConfigured = statusQuery.data?.clientConfigured ?? false;
 
+  const menuItems: MenuItem[] = [
+    {
+      id: "profile",
+      icon: UserIcon,
+      title: "Detalhes do perfil",
+      onClick: () => toast.info("Em breve"),
+    },
+    {
+      id: "password",
+      icon: Lock,
+      title: "Palavra-passe",
+      onClick: () => toast.info("Em breve"),
+    },
+    {
+      id: "notifications",
+      icon: Bell,
+      title: "Notificações",
+      isSwitch: true,
+      value: notifications,
+      onToggle: setNotifications,
+    },
+    {
+      id: "darkmode",
+      icon: Moon,
+      title: "Modo escuro",
+      isSwitch: true,
+      value: darkMode,
+      onToggle: toggleDarkMode,
+    },
+    {
+      id: "about",
+      icon: Info,
+      title: "Sobre a aplicação",
+      onClick: () => toast.info("Brio · v1.0.0"),
+    },
+    {
+      id: "help",
+      icon: HelpCircle,
+      title: "Ajuda / FAQ",
+      onClick: () => toast.info("Em breve"),
+    },
+    {
+      id: "deactivate",
+      icon: Trash2,
+      title: "Desativar conta",
+      danger: true,
+      onClick: () => toast.error("Contate o suporte para desativar a conta."),
+    },
+  ];
+
+  const initials =
+    (name ?? email ?? "?")
+      .split(" ")
+      .map((s) => s[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
+
   return (
     <main
       className="flex min-h-screen flex-col bg-background text-foreground"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <header className="px-5 pb-3 pt-4">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Perfil</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Conta e integrações.</p>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Definições</h1>
       </header>
+
       <section className="flex-1 space-y-6 px-5 pb-6">
-        <div className="glass rounded-2xl p-4">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Conta
+        {/* Avatar / user */}
+        <div className="flex flex-col items-center pt-2">
+          <div className="relative">
+            <Avatar className="h-20 w-20 ring-2 ring-white/40 dark:ring-white/10">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={name ?? "avatar"} />}
+              <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              onClick={() => toast.info("Em breve")}
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-background"
+              aria-label="Alterar avatar"
+            >
+              <Camera className="h-3.5 w-3.5" />
+            </button>
           </div>
-          <div className="mt-2 font-medium">{name ?? "—"}</div>
+          <div className="mt-3 text-lg font-semibold">{name ?? "—"}</div>
           <div className="text-sm text-muted-foreground">{email ?? "—"}</div>
-          <Button
-            variant="outline"
-            className="mt-4 w-full"
-            onClick={handleSignOut}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
         </div>
 
-        <div className="glass rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Integração
-              </div>
-              <div className="mt-1 flex items-center gap-2 font-medium">
+        {/* Other settings */}
+        <div>
+          <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Outras definições
+          </div>
+          <ul className="glass overflow-hidden rounded-2xl">
+            {menuItems.map((item, i) => {
+              const Icon = item.icon;
+              const isLast = i === menuItems.length - 1;
+              const content = (
+                <div className="flex w-full items-center justify-between px-4 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      className={`h-5 w-5 ${item.danger ? "text-destructive" : "text-foreground/80"}`}
+                      strokeWidth={2}
+                    />
+                    <span
+                      className={`text-[15px] ${item.danger ? "text-destructive" : "text-foreground"}`}
+                    >
+                      {item.title}
+                    </span>
+                  </div>
+                  {item.isSwitch ? (
+                    <Switch checked={item.value} onCheckedChange={item.onToggle} />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+              );
+              return (
+                <li
+                  key={item.id}
+                  className={!isLast ? "border-b border-white/20 dark:border-white/10" : ""}
+                >
+                  {item.isSwitch ? (
+                    content
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={item.onClick}
+                      className="w-full text-left transition active:bg-white/20 dark:active:bg-white/5"
+                    >
+                      {content}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {/* Integrations */}
+        <div>
+          <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Integrações
+          </div>
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-medium">
                 <GoogleIcon className="h-4 w-4" />
                 Google Calendar
               </div>
+              <StatusBadge
+                loading={statusQuery.isLoading}
+                connected={connected}
+                clientConfigured={clientConfigured}
+              />
             </div>
-            <StatusBadge
-              loading={statusQuery.isLoading}
-              connected={connected}
-              clientConfigured={clientConfigured}
-            />
-          </div>
 
-          {!clientConfigured && (
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-100">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                O cliente OAuth do Google Calendar ainda não foi configurado no workspace.
-                Um administrador precisa aprovar o App User Connector para habilitar a sincronização.
+            {!clientConfigured && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-100">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  O cliente OAuth do Google Calendar ainda não foi configurado. Um administrador
+                  precisa aprovar para habilitar a sincronização.
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <p className="mt-3 text-xs text-muted-foreground">
-            Ao conectar, seus eventos serão criados, atualizados e removidos no seu Google Calendar
-            automaticamente.
-          </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Ao conectar, os seus eventos são criados, atualizados e removidos no Google Calendar
+              automaticamente.
+            </p>
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            {connected ? (
-              <>
-                <Button className="flex-1" onClick={handleSync} disabled={syncing}>
-                  {syncing ? (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              {connected ? (
+                <>
+                  <Button className="flex-1" onClick={handleSync} disabled={syncing}>
+                    {syncing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Sincronizar agora
+                  </Button>
+                  <Button variant="outline" onClick={handleDisconnect}>
+                    Desconectar
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  className="flex-1"
+                  onClick={handleConnect}
+                  disabled={connecting || !clientConfigured}
+                >
+                  {connecting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <RefreshCw className="mr-2 h-4 w-4" />
+                    <GoogleIcon className="mr-2 h-4 w-4" />
                   )}
-                  Sincronizar agora
+                  Conectar Google Calendar
                 </Button>
-                <Button variant="outline" onClick={handleDisconnect}>
-                  Desconectar
-                </Button>
-              </>
-            ) : (
-              <Button
-                className="flex-1"
-                onClick={handleConnect}
-                disabled={connecting || !clientConfigured}
-              >
-                {connecting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <GoogleIcon className="mr-2 h-4 w-4" />
-                )}
-                Conectar Google Calendar
-              </Button>
-            )}
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Sign out */}
+        <Button variant="outline" className="w-full" onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sair
+        </Button>
+
+        <p className="pt-2 text-center text-xs text-muted-foreground">Versão 1.0.0</p>
       </section>
+
       <BottomNavSpacer />
       <BottomNav />
     </main>
   );
 }
+
+type MenuItem = {
+  id: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  danger?: boolean;
+} & (
+  | { isSwitch: true; value: boolean; onToggle: (v: boolean) => void; onClick?: undefined }
+  | { isSwitch?: false; onClick: () => void; value?: undefined; onToggle?: undefined }
+);
 
 function StatusBadge({
   loading,
@@ -236,8 +411,7 @@ function StatusBadge({
   if (loading)
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        …
+        <Loader2 className="h-3 w-3 animate-spin" />…
       </span>
     );
   if (!clientConfigured)
