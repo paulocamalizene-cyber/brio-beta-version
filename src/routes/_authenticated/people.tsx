@@ -42,14 +42,21 @@ function PeoplePage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", company: "" });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts"],
+    queryKey: ["contatos"],
     queryFn: async (): Promise<Contact[]> => {
       const { data, error } = await supabase
-        .from("contacts")
-        .select("id, name, email, phone, company, avatar_url")
-        .order("name", { ascending: true });
+        .from("contatos")
+        .select("id, nome, email, telefone, empresa, avatar_url")
+        .order("nome", { ascending: true });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map((r) => ({
+        id: r.id,
+        name: r.nome,
+        email: r.email,
+        phone: r.telefone,
+        company: r.empresa,
+        avatar_url: r.avatar_url,
+      }));
     },
   });
 
@@ -58,15 +65,16 @@ function PeoplePage() {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) throw new Error("Sem sessão");
-      const { error } = await supabase.from("contacts").insert({
+      const { error } = await supabase.from("contatos").insert({
         user_id: userId,
-        name: payload.name.trim(),
+        nome: payload.name.trim(),
         email: payload.email.trim() || null,
-        phone: payload.phone.trim() || null,
-        company: payload.company.trim() || null,
+        telefone: payload.phone.trim() || null,
+        empresa: payload.company.trim() || null,
       });
       if (error) throw error;
     },
+
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contacts"] });
       setModalOpen(false);
