@@ -312,18 +312,8 @@ export async function pullFromGoogle(userId: string): Promise<PullResult> {
 
     for (const item of body.items ?? []) {
       try {
-        if (item.status === "cancelled") {
-          const { error, count } = await supabaseAdmin
-            .from("events")
-            .delete({ count: "exact" })
-            .eq("user_id", userId)
-            .eq("google_event_id", item.id);
-          if (error) throw error;
-          if (count) result.deleted += count;
-          continue;
-        }
-
-        // Check for existing local row + conflict resolution
+        // Safe sync: only update rows that already exist locally.
+        // - Google-only events (including "cancelled") are ignored — never delete or import.
         const { data: existing } = await supabaseAdmin
           .from("events")
           .select("id, updated_at")
@@ -331,13 +321,13 @@ export async function pullFromGoogle(userId: string): Promise<PullResult> {
           .eq("google_event_id", item.id)
           .maybeSingle();
 
-        const googleUpdated = item.updated ? new Date(item.updated).getTime() : 0;
-        const localUpdated = existing?.updated_at ? new Date(existing.updated_at).getTime() : 0;
+        if (!existing) continue; // exists on Google but not locally → ignore
 
-        if (existing && localUpdated > googleUpdated) {
-          // local is newer — skip
-          continue;
-        }
+        if (item.status === "cancelled") continue; // never delete local rows
+
+        const googleUpdated = item.updated ? new Date(item.updated).getTime() : 0;
+        const localUpdated = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+        if (localUpdated >= googleUpdated) continue; // local is newer or equal — skip
 
         const isAllDay = !!item.start?.date;
         const start_date =
@@ -366,18 +356,12 @@ export async function pullFromGoogle(userId: string): Promise<PullResult> {
           last_synced_at: new Date().toISOString(),
         };
 
-        if (existing) {
-          const { error } = await supabaseAdmin
-            .from("events")
-            .update(row)
-            .eq("id", existing.id);
-          if (error) throw error;
-          result.updated++;
-        } else {
-          const { error } = await supabaseAdmin.from("events").insert(row);
-          if (error) throw error;
-          result.imported++;
-        }
+        const { error } = await supabaseAdmin
+          .from("events")
+          .update(row)
+          .eq("id", existing.id);
+        if (error) throw error;
+        result.updated++;
       } catch (e) {
         result.errors.push(e instanceof Error ? e.message : String(e));
       }
