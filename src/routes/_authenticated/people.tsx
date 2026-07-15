@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
-import { Search, Plus, X, Calendar as CalendarIcon, Users, Loader2, Mail, Phone, Building2 } from "lucide-react";
+import { Search, Plus, X, Calendar as CalendarIcon, Users, Loader2, Mail, Phone, Building2, Download } from "lucide-react";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/people")({
   head: () => ({
@@ -34,12 +35,169 @@ function initials(name: string) {
     .join("");
 }
 
+type ImportRow = { nome: string; email: string | null; telefone: string | null; empresa: string | null };
+
+function unescapeVCard(v: string) {
+  return v.replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
+}
+
+function parseVCard(text: string): ImportRow[] {
+  // Unfold RFC 6350 line continuations
+  const unfolded = text.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
+  const cards = unfolded.split(/BEGIN:VCARD/i).slice(1);
+  const out: ImportRow[] = [];
+  for (const raw of cards) {
+    const body = raw.split(/END:VCARD/i)[0];
+    const lines = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let nome = "";
+    let email: string | null = null;
+    let telefone: string | null = null;
+    let empresa: string | null = null;
+    for (const line of lines) {
+      const colon = line.indexOf(":");
+      if (colon < 0) continue;
+      const rawKey = line.slice(0, colon).toUpperCase();
+      const value = unescapeVCard(line.slice(colon + 1)).trim();
+      const key = rawKey.split(";")[0];
+      if (key === "FN" && !nome) nome = value;
+      else if (key === "N" && !nome) {
+        const [last, first] = value.split(";");
+        nome = [first, last].filter(Boolean).join(" ").trim();
+      } else if (key === "EMAIL" && !email) email = value;
+      else if (key === "TEL" && !telefone) telefone = value;
+      else if (key === "ORG" && !empresa) empresa = value.split(";")[0];
+    }
+    if (nome) out.push({ nome, email, telefone, empresa });
+  }
+  return out;
+}
+
+function parseCSVLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cur += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === "," || c === ";") { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map((s) => s.trim());
+}
+
+function parseCSV(text: string): ImportRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase());
+  const idx = (names: string[]) => headers.findIndex((h) => names.includes(h));
+  const iNome = idx(["nome", "name", "full name", "fullname"]);
+  const iEmail = idx(["email", "e-mail", "mail"]);
+  const iTel = idx(["telefone", "phone", "telemóvel", "telemovel", "mobile", "tel"]);
+  const iEmp = idx(["empresa", "company", "organization", "organização", "organizacao"]);
+  const out: ImportRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    const nome = (iNome >= 0 ? cols[iNome] : cols[0]) ?? "";
+    if (!nome) continue;
+    out.push({
+      nome,
+      email: iEmail >= 0 ? cols[iEmail] || null : null,
+      telefone: iTel >= 0 ? cols[iTel] || null : null,
+      empresa: iEmp >= 0 ? cols[iEmp] || null : null,
+    });
+  }
+  return out;
+}
+
+
 function PeoplePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", company: "" });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const importMutation = useMutation({
+    mutationFn: async (rows: ImportRow[]) => {
+      if (rows.length === 0) throw new Error("Nenhum contacto encontrado");
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Sem sessão");
+      const payload = rows
+        .filter((r) => r.nome.trim().length > 0)
+        .map((r) => ({
+          user_id: userId,
+          nome: r.nome.trim(),
+          email: r.email?.trim() || null,
+          telefone: r.telefone?.trim() || null,
+          empresa: r.empresa?.trim() || null,
+        }));
+      const { error } = await supabase.from("contatos").insert(payload);
+      if (error) throw error;
+      return payload.length;
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ["contatos"] });
+      toast.success(`${n} contacto${n === 1 ? "" : "s"} importado${n === 1 ? "" : "s"}`);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao importar"),
+  });
+
+  const handleImport = async () => {
+    // 1) Try native Contact Picker API
+    const nav = navigator as Navigator & {
+      contacts?: {
+        select: (
+          props: string[],
+          opts?: { multiple?: boolean },
+        ) => Promise<Array<{ name?: string[]; email?: string[]; tel?: string[] }>>;
+      };
+    };
+    if (nav.contacts?.select) {
+      try {
+        const picked = await nav.contacts.select(["name", "email", "tel"], { multiple: true });
+        const rows: ImportRow[] = picked.map((p) => ({
+          nome: p.name?.[0] ?? "",
+          email: p.email?.[0] ?? null,
+          telefone: p.tel?.[0] ?? null,
+          empresa: null,
+        }));
+        importMutation.mutate(rows);
+        return;
+      } catch (e) {
+        // User cancelled or permission denied — fall through to file picker
+        console.warn("Contact Picker cancelled/failed", e);
+      }
+    }
+    // 2) Fallback: open .vcf / .csv file picker
+    fileInputRef.current?.click();
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const rows = /\.csv$/i.test(file.name) ? parseCSV(text) : parseVCard(text);
+      if (rows.length === 0) {
+        toast.error("Ficheiro sem contactos reconhecidos");
+        return;
+      }
+      importMutation.mutate(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha a ler ficheiro");
+    }
+  };
+
 
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contatos"],
@@ -118,10 +276,33 @@ function PeoplePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="mx-auto max-w-md px-4 pt-6 pb-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Contactos</h1>
-        <p className="text-sm text-muted-foreground">Toca num contacto para agendar.</p>
+      <header className="mx-auto flex max-w-md items-start justify-between gap-3 px-4 pt-6 pb-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Contactos</h1>
+          <p className="text-sm text-muted-foreground">Toca num contacto para agendar.</p>
+        </div>
+        <button
+          onClick={handleImport}
+          disabled={importMutation.isPending}
+          className="glass mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
+          aria-label="Importar contactos"
+        >
+          {importMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Importar
+        </button>
       </header>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".vcf,text/vcard,text/x-vcard,.csv,text/csv"
+        onChange={handleFile}
+        className="hidden"
+      />
+
 
       <div className="mx-auto max-w-md px-4">
         <div className="glass flex items-center gap-2 rounded-2xl px-3 py-2">
