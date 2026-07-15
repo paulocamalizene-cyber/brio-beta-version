@@ -22,7 +22,7 @@ export function BottomNav() {
             <Link
               to={to}
               activeOptions={{ exact: true }}
-              className="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors"
+              className="press-scale flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-medium text-muted-foreground"
               activeProps={{ className: "text-primary bg-white/25 dark:bg-white/10" }}
             >
               <Icon className="h-6 w-6" strokeWidth={2} />

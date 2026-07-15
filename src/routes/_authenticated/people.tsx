@@ -284,7 +284,7 @@ function PeoplePage() {
         <button
           onClick={handleImport}
           disabled={importMutation.isPending}
-          className="glass mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
+          className="press-scale glass mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
           aria-label="Importar contactos"
         >
           {importMutation.isPending ? (
@@ -341,7 +341,7 @@ function PeoplePage() {
               <li key={c.id}>
                 <button
                   onClick={() => scheduleWith(c)}
-                  className="glass flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-white/30 dark:hover:bg-white/10"
+                  className="press-scale glass flex w-full items-center gap-3 rounded-2xl p-3 text-left hover:bg-white/30 dark:hover:bg-white/10"
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-sm font-semibold text-primary">
                     {c.avatar_url ? (
@@ -383,7 +383,7 @@ function PeoplePage() {
 
       <button
         onClick={() => setModalOpen(true)}
-        className="fixed right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+        className="press-scale fixed right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
         style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
         aria-label="Adicionar contacto"
       >
