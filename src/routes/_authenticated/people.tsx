@@ -76,7 +76,7 @@ function PeoplePage() {
     },
 
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["contacts"] });
+      qc.invalidateQueries({ queryKey: ["contatos"] });
       setModalOpen(false);
       setForm({ name: "", email: "", phone: "", company: "" });
       toast.success("Contacto adicionado");
