@@ -85,15 +85,19 @@ function PeoplePage() {
   );
 
   const scheduleWith = (c: Contact) => {
-    navigate({
-      to: "/calendar",
-      search: {
-        title: `Reunião com ${c.name}`,
-        attendee: c.email ?? "",
-        location: c.company ?? "",
-      } as never,
-    });
+    try {
+      sessionStorage.setItem(
+        "calendar.prefill",
+        JSON.stringify({
+          title: `Reunião com ${c.name}`,
+          notes: [c.email, c.phone].filter(Boolean).join(" · "),
+          location: c.company ?? "",
+        }),
+      );
+    } catch {}
+    navigate({ to: "/calendar" });
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

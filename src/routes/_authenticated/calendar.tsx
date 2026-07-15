@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { BottomNav } from "@/components/BottomNav";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEventsSync, type SyncInfo } from "@/hooks/useEventsSync";
 import {
@@ -27,12 +28,14 @@ import {
   Repeat,
   Search,
   Trash2,
+  Users,
   X,
   AlertTriangle,
   CheckCircle2,
   CloudOff,
   Loader2,
 } from "lucide-react";
+
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -357,6 +360,42 @@ function CalendarApp() {
   useEffect(() => {
     localStorage.setItem(FAV_KEY, JSON.stringify(favColors));
   }, [favColors]);
+
+  const navigate = useNavigate();
+
+  // Prefill from Contacts: if a contact was picked on /people, open the
+  // create dialog with its info pre-populated.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("calendar.prefill");
+      if (!raw) return;
+      sessionStorage.removeItem("calendar.prefill");
+      const p = JSON.parse(raw) as {
+        title?: string;
+        notes?: string;
+        location?: string;
+      };
+      const s = snap(9 * 60);
+      const e = Math.min(DAY_MINUTES, s + 60);
+      setDraft({
+        title: p.title ?? "",
+        date: fmtKey(new Date()),
+        start: minutesToLabel(s),
+        end: minutesToLabel(e),
+        color: DEFAULT_COLOR,
+        recurrence: { ...DEFAULT_RECURRENCE },
+        kind: "informative",
+        notifications: [],
+        notes: p.notes ?? "",
+        location: p.location ?? "",
+        locationCoords: null,
+      });
+      setGeocodeError(null);
+      setEditScope("series");
+      setDialog({ mode: "create" });
+    } catch {}
+  }, []);
+
 
   const { statuses: syncStatuses } = useEventsSync(events);
 
@@ -736,9 +775,16 @@ function CalendarApp() {
             <BarChart3 className="h-5 w-5" strokeWidth={2.25} />
           </button>
           <Search className="h-5 w-5" strokeWidth={2.25} />
+          <button
+            onClick={() => navigate({ to: "/people" })}
+            aria-label="Adicionar a partir de contacto"
+          >
+            <Users className="h-5 w-5" strokeWidth={2.25} />
+          </button>
           <button onClick={() => openCreate(9 * 60)} aria-label="Novo evento">
             <Plus className="h-6 w-6" strokeWidth={2.25} />
           </button>
+
         </div>
       </header>
 
