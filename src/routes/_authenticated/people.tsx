@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
-import { Search, Plus, X, Calendar as CalendarIcon, Users, Loader2, Mail, Phone, Building2 } from "lucide-react";
+import { Search, Plus, X, Calendar as CalendarIcon, Users, Loader2, Mail, Phone, Building2, Download } from "lucide-react";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/people")({
   head: () => ({
