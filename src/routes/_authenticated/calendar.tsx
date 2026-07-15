@@ -771,7 +771,6 @@ function CalendarApp() {
           <button
             onClick={() => setStatsOpen(true)}
             aria-label="Estatísticas"
-            className="press-scale rounded-full p-1"
           >
             <BarChart3 className="h-5 w-5" strokeWidth={2.25} />
           </button>
@@ -779,15 +778,10 @@ function CalendarApp() {
           <button
             onClick={() => navigate({ to: "/people" })}
             aria-label="Adicionar a partir de contacto"
-            className="press-scale rounded-full p-1"
           >
             <Users className="h-5 w-5" strokeWidth={2.25} />
           </button>
-          <button
-            onClick={() => openCreate(9 * 60)}
-            aria-label="Novo evento"
-            className="press-scale rounded-full p-1"
-          >
+          <button onClick={() => openCreate(9 * 60)} aria-label="Novo evento">
             <Plus className="h-6 w-6" strokeWidth={2.25} />
           </button>
 
