@@ -276,10 +276,33 @@ function PeoplePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="mx-auto max-w-md px-4 pt-6 pb-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Contactos</h1>
-        <p className="text-sm text-muted-foreground">Toca num contacto para agendar.</p>
+      <header className="mx-auto flex max-w-md items-start justify-between gap-3 px-4 pt-6 pb-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Contactos</h1>
+          <p className="text-sm text-muted-foreground">Toca num contacto para agendar.</p>
+        </div>
+        <button
+          onClick={handleImport}
+          disabled={importMutation.isPending}
+          className="glass mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
+          aria-label="Importar contactos"
+        >
+          {importMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Importar
+        </button>
       </header>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".vcf,text/vcard,text/x-vcard,.csv,text/csv"
+        onChange={handleFile}
+        className="hidden"
+      />
+
 
       <div className="mx-auto max-w-md px-4">
         <div className="glass flex items-center gap-2 rounded-2xl px-3 py-2">
