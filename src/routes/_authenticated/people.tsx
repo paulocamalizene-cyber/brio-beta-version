@@ -284,7 +284,7 @@ function PeoplePage() {
         <button
           onClick={handleImport}
           disabled={importMutation.isPending}
-          className="glass mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
+          className="press-scale glass mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
           aria-label="Importar contactos"
         >
           {importMutation.isPending ? (
