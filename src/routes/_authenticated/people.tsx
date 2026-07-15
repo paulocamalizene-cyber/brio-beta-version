@@ -35,6 +35,88 @@ function initials(name: string) {
     .join("");
 }
 
+type ImportRow = { nome: string; email: string | null; telefone: string | null; empresa: string | null };
+
+function unescapeVCard(v: string) {
+  return v.replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
+}
+
+function parseVCard(text: string): ImportRow[] {
+  // Unfold RFC 6350 line continuations
+  const unfolded = text.replace(/\r\n[ \t]/g, "").replace(/\n[ \t]/g, "");
+  const cards = unfolded.split(/BEGIN:VCARD/i).slice(1);
+  const out: ImportRow[] = [];
+  for (const raw of cards) {
+    const body = raw.split(/END:VCARD/i)[0];
+    const lines = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let nome = "";
+    let email: string | null = null;
+    let telefone: string | null = null;
+    let empresa: string | null = null;
+    for (const line of lines) {
+      const colon = line.indexOf(":");
+      if (colon < 0) continue;
+      const rawKey = line.slice(0, colon).toUpperCase();
+      const value = unescapeVCard(line.slice(colon + 1)).trim();
+      const key = rawKey.split(";")[0];
+      if (key === "FN" && !nome) nome = value;
+      else if (key === "N" && !nome) {
+        const [last, first] = value.split(";");
+        nome = [first, last].filter(Boolean).join(" ").trim();
+      } else if (key === "EMAIL" && !email) email = value;
+      else if (key === "TEL" && !telefone) telefone = value;
+      else if (key === "ORG" && !empresa) empresa = value.split(";")[0];
+    }
+    if (nome) out.push({ nome, email, telefone, empresa });
+  }
+  return out;
+}
+
+function parseCSVLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cur += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === "," || c === ";") { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map((s) => s.trim());
+}
+
+function parseCSV(text: string): ImportRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase());
+  const idx = (names: string[]) => headers.findIndex((h) => names.includes(h));
+  const iNome = idx(["nome", "name", "full name", "fullname"]);
+  const iEmail = idx(["email", "e-mail", "mail"]);
+  const iTel = idx(["telefone", "phone", "telemóvel", "telemovel", "mobile", "tel"]);
+  const iEmp = idx(["empresa", "company", "organization", "organização", "organizacao"]);
+  const out: ImportRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    const nome = (iNome >= 0 ? cols[iNome] : cols[0]) ?? "";
+    if (!nome) continue;
+    out.push({
+      nome,
+      email: iEmail >= 0 ? cols[iEmail] || null : null,
+      telefone: iTel >= 0 ? cols[iTel] || null : null,
+      empresa: iEmp >= 0 ? cols[iEmp] || null : null,
+    });
+  }
+  return out;
+}
+
+
 function PeoplePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
