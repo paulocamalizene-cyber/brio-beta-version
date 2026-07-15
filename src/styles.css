@@ -138,6 +138,24 @@
   box-shadow: var(--glass-shadow-lg);
 }
 
+@utility press-scale {
+  transition-property: transform, background-color, color, box-shadow, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+.press-scale:active {
+  transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  .press-scale {
+    transition: none;
+  }
+  .press-scale:active {
+    transform: none;
+  }
+}
+
 a[href*="lovable.dev"],
 iframe[src*="lovable.dev"],
 div[style*="Edit with Lovable"],
