@@ -50,40 +50,40 @@ export type Database = {
         }
         Relationships: []
       }
-      contacts: {
+      contatos: {
         Row: {
           avatar_url: string | null
-          company: string | null
           created_at: string
           email: string | null
+          empresa: string | null
           id: string
-          name: string
+          nome: string
           notes: string | null
-          phone: string | null
+          telefone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
-          company?: string | null
           created_at?: string
           email?: string | null
+          empresa?: string | null
           id?: string
-          name: string
+          nome: string
           notes?: string | null
-          phone?: string | null
+          telefone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
-          company?: string | null
           created_at?: string
           email?: string | null
+          empresa?: string | null
           id?: string
-          name?: string
+          nome?: string
           notes?: string | null
-          phone?: string | null
+          telefone?: string | null
           updated_at?: string
           user_id?: string
         }
