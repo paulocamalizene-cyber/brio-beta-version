@@ -123,6 +123,81 @@ function PeoplePage() {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", company: "" });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const importMutation = useMutation({
+    mutationFn: async (rows: ImportRow[]) => {
+      if (rows.length === 0) throw new Error("Nenhum contacto encontrado");
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Sem sessão");
+      const payload = rows
+        .filter((r) => r.nome.trim().length > 0)
+        .map((r) => ({
+          user_id: userId,
+          nome: r.nome.trim(),
+          email: r.email?.trim() || null,
+          telefone: r.telefone?.trim() || null,
+          empresa: r.empresa?.trim() || null,
+        }));
+      const { error } = await supabase.from("contatos").insert(payload);
+      if (error) throw error;
+      return payload.length;
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ["contatos"] });
+      toast.success(`${n} contacto${n === 1 ? "" : "s"} importado${n === 1 ? "" : "s"}`);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao importar"),
+  });
+
+  const handleImport = async () => {
+    // 1) Try native Contact Picker API
+    const nav = navigator as Navigator & {
+      contacts?: {
+        select: (
+          props: string[],
+          opts?: { multiple?: boolean },
+        ) => Promise<Array<{ name?: string[]; email?: string[]; tel?: string[] }>>;
+      };
+    };
+    if (nav.contacts?.select) {
+      try {
+        const picked = await nav.contacts.select(["name", "email", "tel"], { multiple: true });
+        const rows: ImportRow[] = picked.map((p) => ({
+          nome: p.name?.[0] ?? "",
+          email: p.email?.[0] ?? null,
+          telefone: p.tel?.[0] ?? null,
+          empresa: null,
+        }));
+        importMutation.mutate(rows);
+        return;
+      } catch (e) {
+        // User cancelled or permission denied — fall through to file picker
+        console.warn("Contact Picker cancelled/failed", e);
+      }
+    }
+    // 2) Fallback: open .vcf / .csv file picker
+    fileInputRef.current?.click();
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const rows = /\.csv$/i.test(file.name) ? parseCSV(text) : parseVCard(text);
+      if (rows.length === 0) {
+        toast.error("Ficheiro sem contactos reconhecidos");
+        return;
+      }
+      importMutation.mutate(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha a ler ficheiro");
+    }
+  };
+
 
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contatos"],
