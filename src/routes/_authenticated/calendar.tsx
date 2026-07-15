@@ -361,6 +361,42 @@ function CalendarApp() {
     localStorage.setItem(FAV_KEY, JSON.stringify(favColors));
   }, [favColors]);
 
+  const navigate = useNavigate();
+
+  // Prefill from Contacts: if a contact was picked on /people, open the
+  // create dialog with its info pre-populated.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("calendar.prefill");
+      if (!raw) return;
+      sessionStorage.removeItem("calendar.prefill");
+      const p = JSON.parse(raw) as {
+        title?: string;
+        notes?: string;
+        location?: string;
+      };
+      const s = snap(9 * 60);
+      const e = Math.min(DAY_MINUTES, s + 60);
+      setDraft({
+        title: p.title ?? "",
+        date: fmtKey(new Date()),
+        start: minutesToLabel(s),
+        end: minutesToLabel(e),
+        color: DEFAULT_COLOR,
+        recurrence: { ...DEFAULT_RECURRENCE },
+        kind: "informative",
+        notifications: [],
+        notes: p.notes ?? "",
+        location: p.location ?? "",
+        locationCoords: null,
+      });
+      setGeocodeError(null);
+      setEditScope("series");
+      setDialog({ mode: "create" });
+    } catch {}
+  }, []);
+
+
   const { statuses: syncStatuses } = useEventsSync(events);
 
   const selectedKey = fmtKey(selected);
