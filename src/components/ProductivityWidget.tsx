@@ -198,7 +198,7 @@ export function ProductivityWidget() {
   return (
     <section
       aria-label="Widget de produtividade"
-      className="mx-5 mt-2 rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur"
+      className="mx-5 mt-2 rounded-2xl border border-border bg-card p-4 shadow-sm"
     >
       {/* Streak */}
       <div className="flex items-center justify-between">
