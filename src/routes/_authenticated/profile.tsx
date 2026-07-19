@@ -89,11 +89,9 @@ function ProfilePage() {
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
-    const prefersDark =
-      stored === "dark" ||
-      (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    setDarkMode(prefersDark);
-    document.documentElement.classList.toggle("dark", prefersDark);
+    const isDark = stored === "dark";
+    setDarkMode(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
   function toggleDarkMode(value: boolean) {
