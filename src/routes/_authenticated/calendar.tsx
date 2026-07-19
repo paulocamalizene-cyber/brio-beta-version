@@ -769,34 +769,9 @@ function CalendarApp() {
             >
               {format(selected, "MMMM", { locale: ptBR })}
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] text-muted-foreground dark:text-white/60">
-                {weekEventsCount} {weekEventsCount === 1 ? "event" : "events"}
-              </span>
-              <div className="flex items-center gap-1 pl-1 text-primary">
-                <button
-                  onClick={() => setStatsOpen(true)}
-                  aria-label="Estatísticas"
-                  className="p-1"
-                >
-                  <BarChart3 className="h-4 w-4" strokeWidth={2.25} />
-                </button>
-                <button
-                  onClick={() => navigate({ to: "/people" })}
-                  aria-label="Adicionar a partir de contacto"
-                  className="p-1"
-                >
-                  <Users className="h-4 w-4" strokeWidth={2.25} />
-                </button>
-                <button
-                  onClick={() => openCreate(9 * 60)}
-                  aria-label="Novo evento"
-                  className="p-1"
-                >
-                  <Plus className="h-5 w-5" strokeWidth={2.25} />
-                </button>
-              </div>
-            </div>
+            <span className="text-[13px] text-muted-foreground dark:text-white/60">
+              {weekEventsCount} {weekEventsCount === 1 ? "event" : "events"}
+            </span>
           </div>
 
           {/* Weekday labels */}
