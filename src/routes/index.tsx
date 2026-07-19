@@ -30,9 +30,7 @@ function HomePage() {
         </p>
       </header>
       <section className="flex-1">
-        <ClientOnly fallback={null}>
-          {() => <ProductivityWidget />}
-        </ClientOnly>
+        <ProductivityWidget />
       </section>
       <BottomNavSpacer />
       <BottomNav />
