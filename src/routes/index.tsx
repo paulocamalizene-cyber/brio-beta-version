@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
 import { ProductivityWidget } from "@/components/ProductivityWidget";
-import { ClientOnly } from "@tanstack/react-router";
+
+
 
 
 export const Route = createFileRoute("/")({
