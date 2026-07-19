@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Home, Calendar, Users, Map, Settings } from "lucide-react";
+import { Home, Calendar, Users, MapPin, Settings } from "lucide-react";
 
 const items = [
   { to: "/", label: "Home", Icon: Home },
   { to: "/calendar", label: "Calendário", Icon: Calendar },
   { to: "/people", label: "Pessoas", Icon: Users },
-  { to: "/map", label: "Mapa", Icon: Map },
+  { to: "/map", label: "Mapa", Icon: MapPin },
   { to: "/profile", label: "Definições", Icon: Settings },
 ] as const;
 
@@ -16,17 +16,17 @@ export function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)", borderTop: "1px solid var(--glass-border)" }}
       aria-label="Navegação principal"
     >
-      <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 py-1.5">
+      <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 py-2">
         {items.map(({ to, label, Icon }) => (
           <li key={to} className="flex-1">
             <Link
               to={to}
               activeOptions={{ exact: true }}
-              className="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors"
-              activeProps={{ className: "text-primary bg-white/25 dark:bg-white/10" }}
+              aria-label={label}
+              className="flex items-center justify-center rounded-xl px-2 py-2 text-muted-foreground transition-colors"
+              activeProps={{ className: "text-primary" }}
             >
               <Icon className="h-6 w-6" strokeWidth={2} />
-              <span>{label}</span>
             </Link>
           </li>
         ))}
