@@ -130,8 +130,28 @@ export const deleteEvent = createServerFn({ method: "POST" })
 
 
 async function syncEventToGoogleInternal(userId: string, eventId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const logSync = async (
+    acao: string,
+    status: "success" | "error" | "info",
+    mensagem?: string | null,
+    google_event_id?: string | null,
+  ) => {
+    try {
+      await supabaseAdmin.from("logs_sincronizacao").insert({
+        user_id: userId,
+        evento_id: eventId,
+        acao,
+        status,
+        mensagem: mensagem ?? null,
+        google_event_id: google_event_id ?? null,
+      });
+    } catch (e) {
+      console.error("logSync failed", e);
+    }
+  };
+
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("events")
       .select("*")
@@ -147,9 +167,11 @@ async function syncEventToGoogleInternal(userId: string, eventId: string) {
         .from("events")
         .update({ sync_status: "local", sync_error: null })
         .eq("id", eventId);
+      await logSync("skip", "info", "Google Calendar não conectado");
       return;
     }
-    const result = row.google_event_id ? await pushUpdate(userId, eventForGoogle) : await pushCreate(userId, eventForGoogle);
+    const isUpdate = !!row.google_event_id;
+    const result = isUpdate ? await pushUpdate(userId, eventForGoogle) : await pushCreate(userId, eventForGoogle);
     if (result.ok) {
       await supabaseAdmin
         .from("events")
@@ -162,14 +184,17 @@ async function syncEventToGoogleInternal(userId: string, eventId: string) {
           last_synced_at: new Date().toISOString(),
         })
         .eq("id", eventId);
+      await logSync(isUpdate ? "update" : "create", "success", null, result.google_event_id ?? row.google_event_id);
     } else {
       await supabaseAdmin
         .from("events")
         .update({ sync_status: "error", sync_error: result.error ?? "unknown" })
         .eq("id", eventId);
+      await logSync(isUpdate ? "update" : "create", "error", result.error ?? "unknown", row.google_event_id);
     }
   } catch (e) {
     console.error("syncEventToGoogleInternal failed", e);
+    await logSync("sync", "error", e instanceof Error ? e.message : String(e));
   }
 }
 

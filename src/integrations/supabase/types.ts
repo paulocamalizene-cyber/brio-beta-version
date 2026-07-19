@@ -161,6 +161,94 @@ export type Database = {
         }
         Relationships: []
       }
+      lembretes: {
+        Row: {
+          created_at: string
+          data_hora: string
+          descricao: string | null
+          evento_id: string | null
+          id: string
+          notificado: boolean
+          notificado_em: string | null
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_hora: string
+          descricao?: string | null
+          evento_id?: string | null
+          id?: string
+          notificado?: boolean
+          notificado_em?: string | null
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_hora?: string
+          descricao?: string | null
+          evento_id?: string | null
+          id?: string
+          notificado?: boolean
+          notificado_em?: string | null
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lembretes_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logs_sincronizacao: {
+        Row: {
+          acao: string
+          created_at: string
+          evento_id: string | null
+          google_event_id: string | null
+          id: string
+          mensagem: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          evento_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          mensagem?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          evento_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logs_sincronizacao_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
