@@ -760,8 +760,8 @@ function CalendarApp() {
 
       <div className="flex min-w-0 flex-1 flex-col">
       {/* Top widget (mobile) — Apple Calendar-style header */}
-      <div className="px-3 pb-2 pt-3 md:hidden">
-        <div className="rounded-2xl bg-card text-card-foreground shadow-sm ring-1 ring-border px-4 py-3 dark:bg-neutral-900 dark:text-white dark:ring-white/10">
+      <div className="md:hidden">
+        <div className="bg-card text-card-foreground border-b border-border px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:bg-neutral-900 dark:text-white dark:border-white/10">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSelected(new Date())}
