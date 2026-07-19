@@ -782,8 +782,7 @@ function CalendarApp() {
           />
         </div>
       </div>
-        </div>
-      </div>
+
 
 
       {/* Day label bar (desktop only) */}
