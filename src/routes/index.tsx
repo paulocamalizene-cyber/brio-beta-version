@@ -27,8 +27,10 @@ function HomePage() {
           Bem-vindo de volta.
         </p>
       </header>
-      <section className="flex-1 px-5">
-        {/* Estrutura preparada para futuros widgets. */}
+      <section className="flex-1">
+        <ClientOnly fallback={null}>
+          {() => <ProductivityWidget />}
+        </ClientOnly>
       </section>
       <BottomNavSpacer />
       <BottomNav />
