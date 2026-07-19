@@ -444,10 +444,19 @@ function CalendarApp() {
 
   const layout = useMemo(() => layoutColumns(dayOccurrences), [dayOccurrences]);
 
-  const stripDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(selected, i - 3)),
-    [selected],
-  );
+  const stripDays = useMemo(() => {
+    const start = startOfWeek(selected, { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  }, [selected]);
+
+  const weekEventsCount = useMemo(() => {
+    let count = 0;
+    for (const d of stripDays) {
+      const key = fmtKey(d);
+      for (const ev of events) if (occursOn(ev, key)) count++;
+    }
+    return count;
+  }, [stripDays, events]);
 
   // ── dialog ──
   function openCreate(startMin: number) {
