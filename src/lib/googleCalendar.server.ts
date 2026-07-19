@@ -190,26 +190,15 @@ export async function pushUpdate(userId: string, event: AppEventRow): Promise<Pu
 }
 
 export async function pushDelete(
-  userId: string,
-  googleEventId: string,
-  googleCalendarId: string | null,
+  _userId: string,
+  _googleEventId: string,
+  _googleCalendarId: string | null,
 ): Promise<PushResult> {
-  const connectionAPIKey = await getConnectionKeyOrNull(userId);
-  if (!connectionAPIKey) return { ok: false, error: "not_connected" };
-  const calId = googleCalendarId ?? CALENDAR_ID;
-  const res = await callAsAppUser({
-    gatewayBaseUrl: GATEWAY_BASE_URL,
-    connectionAPIKey,
-    connectorId: GOOGLE_CALENDAR_CONNECTOR_ID,
-    path: `/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(googleEventId)}`,
-    init: { method: "DELETE" },
-  });
-  if (!res.ok && res.status !== 410 && res.status !== 404) {
-    const text = await res.text();
-    return { ok: false, error: text || res.statusText, errorStatus: res.status };
-  }
+  // Deleção no Google Calendar desativada por política do app.
+  // O app apenas cria e atualiza eventos — nunca remove do Google.
   return { ok: true };
 }
+
 
 export interface PullResult {
   imported: number;
