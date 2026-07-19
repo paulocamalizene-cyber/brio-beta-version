@@ -1,9 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BottomNav, BottomNavSpacer } from "@/components/BottomNav";
-import { ProductivityWidget } from "@/components/ProductivityWidget";
-
-
-
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,9 +25,7 @@ function HomePage() {
           Bem-vindo de volta.
         </p>
       </header>
-      <section className="flex-1">
-        <ProductivityWidget />
-      </section>
+      <section className="flex-1" />
       <BottomNavSpacer />
       <BottomNav />
     </main>
