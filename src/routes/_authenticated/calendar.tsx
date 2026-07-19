@@ -774,49 +774,15 @@ function CalendarApp() {
             </span>
           </div>
 
-          {/* Weekday labels */}
-          <div className="mt-3 grid grid-cols-7">
-            {stripDays.map((d) => (
-              <div
-                key={`lbl-${d.toISOString()}`}
-                className="text-center text-[12px] font-medium text-muted-foreground dark:text-white/60"
-              >
-                {format(d, "EEEEEE", { locale: ptBR })
-                  .replace(/\.$/, "")
-                  .replace(/^./, (c) => c.toUpperCase())}
-              </div>
-            ))}
-          </div>
-
-          {/* Day numbers */}
-          <div className="mt-1 grid grid-cols-7">
-            {stripDays.map((d) => {
-              const isSel = isSameDay(d, selected);
-              const today = isSameDay(d, now);
-              return (
-                <button
-                  key={d.toISOString()}
-                  onClick={() => setSelected(d)}
-                  className="flex items-center justify-center py-1"
-                >
-                  <span
-                    className={[
-                      "flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-medium tabular-nums transition-colors",
-                      isSel
-                        ? "bg-foreground text-background dark:bg-white dark:text-black"
-                        : today
-                          ? "text-primary"
-                          : "text-foreground dark:text-white",
-                    ].join(" ")}
-                  >
-                    {format(d, "d")}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Horizontal date navigator */}
+          <DateNavigator
+            selected={selected}
+            now={now}
+            onSelect={setSelected}
+          />
         </div>
       </div>
+
 
 
       {/* Day label bar (desktop only) */}
@@ -1895,5 +1861,119 @@ function SyncBadge({ info, color }: { info: SyncInfo | null | undefined; color: 
     <span title={title} aria-label={title}>
       {icon}
     </span>
+  );
+}
+
+// ───────────────────────── DateNavigator ─────────────────────────
+
+const DATE_ITEM_WIDTH = 56; // px
+
+function DateNavigator({
+  selected,
+  now,
+  onSelect,
+}: {
+  selected: Date;
+  now: Date;
+  onSelect: (d: Date) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const didInitRef = useRef(false);
+
+  // Range: ± 365 days around today
+  const days = useMemo(() => {
+    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Array.from({ length: 365 * 2 + 1 }, (_, i) =>
+      addDays(base, i - 365),
+    );
+  }, [now]);
+
+  const selectedKey = fmtKey(selected);
+
+  // Center selected date in the viewport
+  const scrollToDate = (d: Date, behavior: ScrollBehavior = "smooth") => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const idx = days.findIndex((x) => isSameDay(x, d));
+    if (idx < 0) return;
+    const target =
+      idx * DATE_ITEM_WIDTH - container.clientWidth / 2 + DATE_ITEM_WIDTH / 2;
+    container.scrollTo({ left: Math.max(0, target), behavior });
+  };
+
+  // Initial centering on today / selected
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    // Wait a tick so layout is ready
+    requestAnimationFrame(() => scrollToDate(selected, "auto"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recenter when selected changes from outside (e.g. tap on timeline)
+  useEffect(() => {
+    if (!didInitRef.current) return;
+    scrollToDate(selected, "smooth");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey]);
+
+  return (
+    <div
+      ref={scrollRef}
+      role="group"
+      aria-label="Navegação de datas"
+      className="mt-2 -mx-4 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ scrollSnapType: "x mandatory" }}
+    >
+      <div className="flex px-4">
+        {days.map((d) => {
+          const isSel = isSameDay(d, selected);
+          const isToday = isSameDay(d, now);
+          const label = format(d, "EEEE, d 'de' MMMM 'de' yyyy", {
+            locale: ptBR,
+          });
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onSelect(d)}
+              aria-label={label}
+              aria-current={isSel ? "date" : undefined}
+              className="flex shrink-0 flex-col items-center justify-center gap-1 py-1 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+              style={{
+                width: DATE_ITEM_WIDTH,
+                scrollSnapAlign: "center",
+              }}
+            >
+              <span
+                className={[
+                  "text-[11px] font-medium uppercase tracking-wide",
+                  isSel
+                    ? "text-foreground dark:text-white"
+                    : isToday
+                      ? "text-primary"
+                      : "text-muted-foreground dark:text-white/60",
+                ].join(" ")}
+              >
+                {format(d, "EEEEEE", { locale: ptBR })
+                  .replace(/\.$/, "")
+                  .replace(/^./, (c) => c.toUpperCase())}
+              </span>
+              <span
+                className={[
+                  "flex h-9 w-9 items-center justify-center rounded-full text-[16px] font-medium tabular-nums transition-colors",
+                  isSel
+                    ? "bg-foreground text-background dark:bg-white dark:text-black"
+                    : isToday
+                      ? "text-primary"
+                      : "text-foreground dark:text-white",
+                ].join(" ")}
+              >
+                {format(d, "d")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
