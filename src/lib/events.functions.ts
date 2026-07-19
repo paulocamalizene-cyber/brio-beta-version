@@ -116,14 +116,8 @@ export const deleteEvent = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context;
-    // Snapshot to know if we need to delete from Google
-    const { data: existing } = await supabase
-      .from("events")
-      .select("google_event_id, google_calendar_id")
-      .eq("id", data.id)
-      .eq("user_id", userId)
-      .maybeSingle();
-
+    // Política: NUNCA remover eventos do Google Calendar.
+    // Apagamos apenas o registro local; o evento no Google permanece intacto.
     const { error } = await supabase
       .from("events")
       .delete()
@@ -131,15 +125,9 @@ export const deleteEvent = createServerFn({ method: "POST" })
       .eq("user_id", userId);
     if (error) throw new Error(error.message);
 
-    if (existing?.google_event_id) {
-      void (async () => {
-        const { pushDelete } = await import("./googleCalendar.server");
-        await pushDelete(userId, existing.google_event_id!, existing.google_calendar_id ?? null);
-      })();
-    }
-
     return { ok: true };
   });
+
 
 async function syncEventToGoogleInternal(userId: string, eventId: string) {
   try {
