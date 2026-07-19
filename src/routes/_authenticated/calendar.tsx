@@ -759,83 +759,90 @@ function CalendarApp() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-      {/* Top bar (mobile) */}
-      <header className="flex items-center justify-between px-4 pb-1 pt-3 md:hidden">
-        <button
-          onClick={() => setSelected((d) => addDays(d, -1))}
-          className="flex items-center gap-0.5 text-[17px] font-normal text-primary"
-        >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
-          <span className="capitalize">
-            {format(addDays(selected, -1), "MMM", { locale: ptBR })}
-          </span>
-        </button>
-        <button
-          onClick={() => setSelected(new Date())}
-          className="font-display text-[17px] font-semibold capitalize"
-        >
-          {format(selected, "MMMM yyyy", { locale: ptBR })}
-        </button>
-        <div className="flex items-center gap-3 text-primary">
-          <button
-            onClick={() => setStatsOpen(true)}
-            aria-label="Estatísticas"
-          >
-            <BarChart3 className="h-5 w-5" strokeWidth={2.25} />
-          </button>
-          <Search className="h-5 w-5" strokeWidth={2.25} />
-          <button
-            onClick={() => navigate({ to: "/people" })}
-            aria-label="Adicionar a partir de contacto"
-          >
-            <Users className="h-5 w-5" strokeWidth={2.25} />
-          </button>
-          <button onClick={() => openCreate(9 * 60)} aria-label="Novo evento">
-            <Plus className="h-6 w-6" strokeWidth={2.25} />
-          </button>
-
-        </div>
-      </header>
-
-      {/* Week strip */}
-      <div className="px-2 pb-2 pt-1 md:hidden">
-        <div className="grid grid-cols-7">
-          {stripDays.map((d) => {
-            const isSel = isSameDay(d, selected);
-            const today = isSameDay(d, now);
-            return (
-              <button
-                key={d.toISOString()}
-                onClick={() => setSelected(d)}
-                className="flex flex-col items-center gap-1 py-1"
-              >
-                <span
-                  className={[
-                    "text-[11px] font-medium uppercase tracking-wide",
-                    today ? "text-primary" : "text-muted-foreground",
-                  ].join(" ")}
+      {/* Top widget (mobile) — Apple Calendar-style header */}
+      <div className="px-3 pb-2 pt-3 md:hidden">
+        <div className="rounded-2xl bg-card text-card-foreground shadow-sm ring-1 ring-border px-4 py-3 dark:bg-neutral-900 dark:text-white dark:ring-white/10">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setSelected(new Date())}
+              className="font-display text-[22px] font-semibold capitalize leading-none"
+            >
+              {format(selected, "MMMM", { locale: ptBR })}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-muted-foreground dark:text-white/60">
+                {weekEventsCount} {weekEventsCount === 1 ? "event" : "events"}
+              </span>
+              <div className="flex items-center gap-1 pl-1 text-primary">
+                <button
+                  onClick={() => setStatsOpen(true)}
+                  aria-label="Estatísticas"
+                  className="p-1"
                 >
-                  {format(d, "EEEEE", { locale: ptBR }).toUpperCase()}
-                </span>
-                <span
-                  className={[
-                    "flex h-9 w-9 items-center justify-center rounded-full font-display text-[22px] font-light tabular-nums",
-                    isSel && today
-                      ? "bg-primary text-primary-foreground"
-                      : isSel
-                        ? "bg-foreground text-background"
+                  <BarChart3 className="h-4 w-4" strokeWidth={2.25} />
+                </button>
+                <button
+                  onClick={() => navigate({ to: "/people" })}
+                  aria-label="Adicionar a partir de contacto"
+                  className="p-1"
+                >
+                  <Users className="h-4 w-4" strokeWidth={2.25} />
+                </button>
+                <button
+                  onClick={() => openCreate(9 * 60)}
+                  aria-label="Novo evento"
+                  className="p-1"
+                >
+                  <Plus className="h-5 w-5" strokeWidth={2.25} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Weekday labels */}
+          <div className="mt-3 grid grid-cols-7">
+            {stripDays.map((d) => (
+              <div
+                key={`lbl-${d.toISOString()}`}
+                className="text-center text-[12px] font-medium text-muted-foreground dark:text-white/60"
+              >
+                {format(d, "EEEEEE", { locale: ptBR })
+                  .replace(/\.$/, "")
+                  .replace(/^./, (c) => c.toUpperCase())}
+              </div>
+            ))}
+          </div>
+
+          {/* Day numbers */}
+          <div className="mt-1 grid grid-cols-7">
+            {stripDays.map((d) => {
+              const isSel = isSameDay(d, selected);
+              const today = isSameDay(d, now);
+              return (
+                <button
+                  key={d.toISOString()}
+                  onClick={() => setSelected(d)}
+                  className="flex items-center justify-center py-1"
+                >
+                  <span
+                    className={[
+                      "flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-medium tabular-nums transition-colors",
+                      isSel
+                        ? "bg-foreground text-background dark:bg-white dark:text-black"
                         : today
                           ? "text-primary"
-                          : "text-foreground",
-                  ].join(" ")}
-                >
-                  {format(d, "d")}
-                </span>
-              </button>
-            );
-          })}
+                          : "text-foreground dark:text-white",
+                    ].join(" ")}
+                  >
+                    {format(d, "d")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
+
 
       {/* Day label bar */}
       <div className="border-y border-border bg-secondary/60 px-4 py-1.5 md:border-t-0 md:bg-transparent md:px-6 md:py-4">
