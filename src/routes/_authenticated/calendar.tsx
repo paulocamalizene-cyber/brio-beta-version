@@ -774,47 +774,14 @@ function CalendarApp() {
             </span>
           </div>
 
-          {/* Weekday labels */}
-          <div className="mt-3 grid grid-cols-7">
-            {stripDays.map((d) => (
-              <div
-                key={`lbl-${d.toISOString()}`}
-                className="text-center text-[12px] font-medium text-muted-foreground dark:text-white/60"
-              >
-                {format(d, "EEEEEE", { locale: ptBR })
-                  .replace(/\.$/, "")
-                  .replace(/^./, (c) => c.toUpperCase())}
-              </div>
-            ))}
-          </div>
-
-          {/* Day numbers */}
-          <div className="mt-1 grid grid-cols-7">
-            {stripDays.map((d) => {
-              const isSel = isSameDay(d, selected);
-              const today = isSameDay(d, now);
-              return (
-                <button
-                  key={d.toISOString()}
-                  onClick={() => setSelected(d)}
-                  className="flex items-center justify-center py-1"
-                >
-                  <span
-                    className={[
-                      "flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-medium tabular-nums transition-colors",
-                      isSel
-                        ? "bg-foreground text-background dark:bg-white dark:text-black"
-                        : today
-                          ? "text-primary"
-                          : "text-foreground dark:text-white",
-                    ].join(" ")}
-                  >
-                    {format(d, "d")}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Horizontal date navigator */}
+          <DateNavigator
+            selected={selected}
+            now={now}
+            onSelect={setSelected}
+          />
+        </div>
+      </div>
         </div>
       </div>
 
