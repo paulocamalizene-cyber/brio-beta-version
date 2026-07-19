@@ -341,7 +341,7 @@ function PeoplePage() {
               <li key={c.id}>
                 <button
                   onClick={() => scheduleWith(c)}
-                  className="glass flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-white/30 dark:hover:bg-white/10"
+                  className="glass flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-accent"
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-sm font-semibold text-primary">
                     {c.avatar_url ? (
